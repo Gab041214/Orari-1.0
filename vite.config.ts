@@ -73,7 +73,7 @@ export default defineConfig({
   // prerender per generare l'HTML statico di ogni pagina) fallisce perché Vite non sa quale
   // file compilare come server e ripiega su un default non valido per un'SSR build.
   environments: {
-        ssr: { build: { rollupOptions: { input: "./src/server.ts" } } },
+            ssr: { build: { rollupOptions: { input: "./server.ts" } } },
   },
 });
 
