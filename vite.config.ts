@@ -3,7 +3,6 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { nitro } from "nitro/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import tsConfigPaths from "vite-tsconfig-paths";
 import { VitePWA } from "vite-plugin-pwa";
 
 // Per un GitHub Pages "project site" il sito vive sotto https://<utente>.github.io/<repo>/,
@@ -15,19 +14,13 @@ const base = process.env.VITE_BASE_PATH || "/";
 export default defineConfig({
   base,
   plugins: [
-    tsConfigPaths(),
-    tanstackStart({
-      // Nessun server a runtime: l'intero sito viene pre-renderizzato in HTML statico
-      // durante la build e pubblicato così com'è su GitHub Pages.
-      prerender: {
-        enabled: true,
-        crawlLinks: true,
-      },
-    }),
+    tanstackStart(),
     viteReact(),
     tailwindcss(),
-    // Output statico puro, pronto per essere pubblicato su GitHub Pages.
-    nitro({ preset: "github_pages" }),
+    // Preset di deploy (es. "github_pages") passato dalla CI tramite la variabile
+    // d'ambiente NITRO_PRESET (vedi .github/workflows/deploy.yml); in locale non è
+    // impostata e Nitro usa il proprio target di default.
+    nitro(),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: null,
@@ -75,4 +68,12 @@ export default defineConfig({
       },
     }),
   ],
+  resolve: { tsconfigPaths: true },
+  // Entry esplicito per l'ambiente SSR: senza questo la build del server (usata anche dal
+  // prerender per generare l'HTML statico di ogni pagina) fallisce perché Vite non sa quale
+  // file compilare come server e ripiega su un default non valido per un'SSR build.
+  environments: {
+    ssr: { build: { rollupOptions: { input: "./src/server.ts" } } },
+  },
 });
+
