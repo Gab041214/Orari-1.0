@@ -30,6 +30,7 @@ jobs:
       - name: Build (sito statico per GitHub Pages)
         run: bun run build
         env:
+          NITRO_PRESET: github_pages
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
 
       - name: Upload artifact
