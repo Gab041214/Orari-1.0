@@ -30,13 +30,15 @@ jobs:
       - name: Build (sito statico per GitHub Pages)
         run: bun run build
         env:
-          NITRO_PRESET: github_pages
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+
+      - name: Copia 404.html
+        run: cp dist/client/index.html dist/client/404.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./.output/public
+          path: ./dist/client
 
   deploy:
     needs: build
