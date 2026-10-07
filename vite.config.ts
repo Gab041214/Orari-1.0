@@ -1,6 +1,5 @@
 import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
-import { nitro } from "nitro/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
@@ -14,22 +13,24 @@ const base = process.env.VITE_BASE_PATH || "/";
 export default defineConfig({
   base,
   plugins: [
-    tanstackStart(),
+    // Modalità SPA: la build produce solo file statici (nessun server a runtime), adatti a
+    // GitHub Pages. La pagina iniziale viene generata come index.html nella cartella
+    // dist/client, che è quella pubblicata.
+    tanstackStart({
+      spa: {
+        enabled: true,
+        prerender: { outputPath: "/index.html" },
+      },
+    }),
     viteReact(),
     tailwindcss(),
-    // Preset di deploy (es. "github_pages") passato dalla CI tramite la variabile
-    // d'ambiente NITRO_PRESET (vedi .github/workflows/deploy.yml); in locale non è
-    // impostata e Nitro usa il proprio target di default.
-    nitro(),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: null,
       filename: "sw.js",
-      // IMPORTANTE: senza questo, il plugin genera sw.js in "dist/" (cartella intermedia
-      // di Vite), che Nitro NON copia in .output/public (la cartella pubblicata davvero su
-      // GitHub Pages). Risultato: /sw.js risponde con l'HTML dell'app invece del vero
-      // service worker, la registrazione fallisce in silenzio e l'offline non funziona mai.
-      outDir: ".output/public",
+      // Il service worker deve finire nella cartella pubblicata davvero su GitHub Pages
+      // (dist/client), altrimenti /sw.js non esiste e l'offline non funziona.
+      outDir: "dist/client",
       devOptions: { enabled: false },
       manifest: false,
       workbox: {
@@ -69,11 +70,4 @@ export default defineConfig({
     }),
   ],
   resolve: { tsconfigPaths: true },
-  // Entry esplicito per l'ambiente SSR: senza questo la build del server (usata anche dal
-  // prerender per generare l'HTML statico di ogni pagina) fallisce perché Vite non sa quale
-  // file compilare come server e ripiega su un default non valido per un'SSR build.
-  environments: {
-            ssr: { build: { rollupOptions: { input: "./server.ts" } } },
-  },
 });
-
