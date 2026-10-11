@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { registerServiceWorker } from "../lib/register-sw";
+import { themeInitScript } from "../lib/theme";
 
 
 function NotFoundComponent() {
@@ -98,6 +99,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:image", content: `${base}icon-512.png` },
       { name: "twitter:image", content: `${base}icon-512.png` },
     ],
+    // Applica subito il tema salvato (chiaro/scuro) prima del primo disegno, senza lampi.
+    scripts: [{ children: themeInitScript }],
     links: [
       {
         rel: "stylesheet",
@@ -105,9 +108,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "manifest", href: `${base}manifest.webmanifest` },
       { rel: "apple-touch-icon", href: `${base}apple-touch-icon.png` },
-      { rel: "icon", type: "image/png", href: `${base}favicon.png` },
       { rel: "icon", href: `${base}favicon.ico`, sizes: "48x48" },
-
+      { rel: "icon", type: "image/png", href: `${base}favicon.png` },
     ],
   }),
 
@@ -119,7 +121,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="it" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
