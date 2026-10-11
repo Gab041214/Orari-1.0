@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check } from "lucide-react";
+import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor } from "lucide-react";
 import { format, addDays, isToday, startOfMonth, endOfMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useThemePref, type ThemePref } from "@/lib/theme";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -459,6 +460,10 @@ function Index() {
     }
   };
   const fileRef = useRef<HTMLInputElement>(null);
+  const [themePref, setThemePref] = useThemePref();
+  const nextTheme: Record<ThemePref, ThemePref> = { system: "light", light: "dark", dark: "system" };
+  const themeLabel: Record<ThemePref, string> = { system: "Tema: automatico", light: "Tema: chiaro", dark: "Tema: scuro" };
+  const ThemeIcon = themePref === "dark" ? Moon : themePref === "light" ? Sun : Monitor;
 
   // Blocca lo scroll della pagina sottostante mentre il menu nomi è aperto: il Popover, a
   // differenza del Dialog, non lo fa in automatico, quindi senza questo il gesto di scorrimento
@@ -658,10 +663,10 @@ function Index() {
 
 
   return (
-    <main className="min-h-screen pb-16" style={{ backgroundColor: "#D8D8DE" }}>
+    <main className="min-h-screen pb-16" style={{ backgroundColor: "var(--app-bg)" }}>
       <div className="mx-auto max-w-6xl px-4 pt-6">
         {/* Titolo + toolbar + giorno in testata (sticky, tutto opaco) */}
-        <section className="sticky top-0 z-20" style={{ backgroundColor: "#D8D8DE" }}>
+        <section className="sticky top-0 z-20" style={{ backgroundColor: "var(--app-bg)" }}>
           <header className="mb-4">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
               {month
@@ -685,7 +690,7 @@ function Index() {
               />
               <Button
                 className="w-full gap-1.5 whitespace-nowrap rounded-xl px-3 text-sm text-white hover:opacity-90"
-                style={{ backgroundColor: "#003335" }}
+                style={{ backgroundColor: "var(--app-upload)" }}
                 onClick={() => fileRef.current?.click()}
                 title="Carica file Excel"
               >
@@ -811,6 +816,15 @@ function Index() {
                     </div>
                   </PopoverContent>
                 </Popover>
+                <button
+                  type="button"
+                  aria-label={themeLabel[themePref]}
+                  title={themeLabel[themePref]}
+                  onClick={() => setThemePref(nextTheme[themePref])}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm"
+                >
+                  <ThemeIcon className="size-4" />
+                </button>
               </div>
             </div>
 
@@ -854,7 +868,7 @@ function Index() {
           {weeks.length > 0 && (
             <div
               className="mt-2 grid grid-cols-7 gap-1 px-1 py-2 sm:gap-2"
-              style={{ backgroundColor: "#D8D8DE" }}
+              style={{ backgroundColor: "var(--app-bg)" }}
             >
               {DAY_LABELS.map((label) => (
                 <div
@@ -874,7 +888,7 @@ function Index() {
             <div
               key={weekIdx}
               className="rounded-2xl border border-border/60 p-1.5 sm:rounded-3xl sm:p-2"
-              style={{ backgroundColor: "#ECECF0" }}
+              style={{ backgroundColor: "var(--app-week)" }}
             >
               <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {DAY_LABELS.map((label, i) => {
@@ -894,7 +908,7 @@ function Index() {
                             "block truncate rounded-full px-2 text-[12px] sm:text-[16px]",
                             today && !data && "border-2 border-foreground",
                           )}
-                          style={{ color: "#5c5c5c" }}
+                          style={{ color: "var(--app-date)" }}
                         >
                           {date ? format(date, "d", { locale: it }) : "—"}
                         </div>
@@ -970,11 +984,11 @@ function Index() {
                   return (
                     <li
                       key={entry.name}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground" style={{ backgroundColor: "#E1E1E6" }}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground" style={{ backgroundColor: "var(--app-chip)" }}
                     >
                       <span className="flex-1 truncate">{entry.name}</span>
                       <span className="text-[10px] text-muted-foreground">{entry.startLabel}</span>
-                      <div className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-white">
+                      <div className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: "var(--app-track)" }}>
                         <div
                           className="absolute inset-y-0 rounded-full"
                           style={{ left: `${left}%`, width: `${width}%`, backgroundColor: accent }}
@@ -1002,11 +1016,11 @@ function Index() {
                   return (
                     <li
                       key={entry.name}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground" style={{ backgroundColor: "#E1E1E6" }}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground" style={{ backgroundColor: "var(--app-chip)" }}
                     >
                       <span className="flex-1 truncate">{entry.name}</span>
                       <span className="text-[10px] text-muted-foreground">{entry.startLabel}</span>
-                      <div className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-white">
+                      <div className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: "var(--app-track)" }}>
                         <div
                           className="absolute inset-y-0 rounded-full"
                           style={{ left: `${left}%`, width: `${width}%`, backgroundColor: accent }}
