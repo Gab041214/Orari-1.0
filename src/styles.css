@@ -63,6 +63,13 @@
 
 :root {
   --radius: 0.625rem;
+  /* Colori specifici dell'app (sfondo pagina, cornice settimana, chip, date, barre) */
+  --app-bg: #D8D8DE;
+  --app-week: #ECECF0;
+  --app-chip: #E1E1E6;
+  --app-date: #5c5c5c;
+  --app-track: #ffffff;
+  --app-upload: #003335;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);
@@ -98,6 +105,13 @@
 }
 
 .dark {
+  color-scheme: dark;
+  --app-bg: oklch(0.129 0.042 264.695);
+  --app-week: oklch(0.18 0.04 265);
+  --app-chip: oklch(0.279 0.041 260.031);
+  --app-date: oklch(0.75 0.03 257);
+  --app-track: oklch(0.38 0.04 260);
+  --app-upload: #0b6b6f;
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
   --card: oklch(0.208 0.042 265.755);
