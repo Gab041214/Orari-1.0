@@ -984,7 +984,7 @@ function Index() {
                         <span
                           role="img"
                           aria-label="Turno modificato"
-                          className="absolute right-1 top-1 z-20 size-[9px] rounded-full"
+                          className="absolute right-[8px] top-[13px] z-20 size-[9px] rounded-full sm:right-[14px] sm:top-[16px]"
                           style={{ backgroundColor: accent, boxShadow: "0 0 0 1.5px var(--app-week)" }}
                         />
                       )}
