@@ -1039,6 +1039,7 @@ function Index() {
         <DialogContent
           className="w-[344px] max-w-[calc(100vw-2rem)] gap-3.5 border-0 bg-transparent p-0 shadow-none sm:rounded-none"
           showCloseButton={false}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <div className="rounded-2xl border border-border/60 bg-background p-5 shadow-lg">
             <DialogTitle className="mb-3 whitespace-nowrap text-lg font-semibold leading-tight tracking-normal">
