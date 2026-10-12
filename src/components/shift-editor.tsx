@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Undo2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { type ShiftOverride } from "@/lib/overrides";
@@ -60,7 +60,7 @@ export function ShiftEditor({
   };
 
   const inputClass =
-    "box-border block h-11 w-full min-w-0 max-w-full appearance-none rounded-xl border border-border bg-clip-padding px-3 text-left text-[17px] text-foreground [-webkit-appearance:none]";
+    "box-border flex h-11 w-full min-w-0 max-w-full appearance-none items-center rounded-xl border border-border bg-clip-padding px-3 py-0 text-left text-[17px] leading-none text-foreground [-webkit-appearance:none] [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:text-left";
 
   return (
     <div className="rounded-2xl border border-border/60 bg-background p-5 shadow-lg">
@@ -68,7 +68,7 @@ export function ShiftEditor({
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left text-foreground"
+        className="flex w-full items-center justify-between gap-2 rounded-md text-left text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <h3 className="text-lg font-semibold">Modifica turno</h3>
         <span className="inline-flex items-center gap-2.5">
@@ -160,9 +160,10 @@ export function ShiftEditor({
                 onReset();
                 setOpen(false);
               }}
-              className="min-h-10 text-sm text-muted-foreground underline"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-[15px] text-foreground"
             >
-              Ripristina dal file
+              <Undo2 className="size-[18px]" aria-hidden="true" />
+              Ripristina turno originale
             </button>
           )}
         </div>
