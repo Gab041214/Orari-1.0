@@ -47,7 +47,8 @@ const FILENAME_KEY = "turni.file.name";
 const SELECTED_KEY = "turni.selected";
 const MONTH_KEY = "turni.month";
 const FILE_SUNDAY_KEY = "turni.fileSunday";
-const ACCENT_KEY = "turni.accent";
+// Indice della coppia di colori scelta (vedi ACCENT_PAIRS); vale per entrambi i temi.
+const ACCENT_KEY = "turni.accentIndex";
 
 const THEME_OPTIONS: { value: ThemePref; label: string; Icon: typeof Sun }[] = [
   { value: "system", label: "Auto", Icon: Monitor },
@@ -55,11 +56,17 @@ const THEME_OPTIONS: { value: ThemePref; label: string; Icon: typeof Sun }[] = [
   { value: "dark", label: "Scuro", Icon: Moon },
 ];
 
-const DEFAULT_ACCENT = "#00B5CE";
-/** Tavolozza colori per gradienti e badge totale ore. */
-const PALETTE = [
-  "#00A1D8", "#B383FE", "#EF3C2C", "#9B9823", "#76BB40",
-  "#52C9C1", "#D5A4DB", "#FF8E1B", "#EAD346", "#C3D117",
+/**
+ * Colori d'accento per badge ore e barre del popup: cinque coppie "agganciate" al tema.
+ * Si salva solo quale coppia è scelta; il colore mostrato dipende dal tema attivo
+ * (light = tema chiaro, dark = tema scuro).
+ */
+const ACCENT_PAIRS: { light: string; dark: string }[] = [
+  { light: "#00701F", dark: "#6CBD00" },
+  { light: "#007499", dark: "#52B3AD" },
+  { light: "#0055B6", dark: "#4496FF" },
+  { light: "#900006", dark: "#EF3C2C" },
+  { light: "#FEC200", dark: "#F6DC7D" },
 ];
 
 /**
@@ -456,17 +463,20 @@ function Index() {
   // Nominativi suggeriti dall'ultimo file caricato ma non ancora in elenco; "Ignora" li nasconde
   // finché non si carica un nuovo file (vedi reset in handleFile).
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
-  const [accent, setAccent] = useState(DEFAULT_ACCENT);
-  const setAccentColor = (c: string) => {
-    setAccent(c);
+  const [accentIdx, setAccentIdx] = useState(0);
+  const setAccentIndex = (i: number) => {
+    setAccentIdx(i);
     try {
-      localStorage.setItem(ACCENT_KEY, c);
+      localStorage.setItem(ACCENT_KEY, String(i));
     } catch {
       /* ignore */
     }
   };
   const fileRef = useRef<HTMLInputElement>(null);
-  const [themePref, setThemePref] = useThemePref();
+  const [themePref, setThemePref, isDark] = useThemePref();
+  // Colore d'accento effettivo: la coppia scelta, nella variante del tema attivo.
+  const accentPair = ACCENT_PAIRS[accentIdx] ?? ACCENT_PAIRS[0]!;
+  const accent = isDark ? accentPair.dark : accentPair.light;
 
   // Blocca lo scroll della pagina sottostante mentre il menu nomi è aperto: il Popover, a
   // differenza del Dialog, non lo fa in automatico, quindi senza questo il gesto di scorrimento
@@ -486,8 +496,8 @@ function Index() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setOptions(JSON.parse(raw));
-      const acc = localStorage.getItem(ACCENT_KEY);
-      if (acc) setAccent(acc);
+      const acc = Number(localStorage.getItem(ACCENT_KEY));
+      if (Number.isInteger(acc) && acc >= 0 && acc < ACCENT_PAIRS.length) setAccentIdx(acc);
       const rawRows = localStorage.getItem(ROWS_KEY);
       if (rawRows) setRows(JSON.parse(rawRows));
       const name = localStorage.getItem(FILENAME_KEY);
@@ -822,17 +832,18 @@ function Index() {
                     </div>
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">Colore</p>
                     <div className="grid grid-cols-5 gap-2">
-                      {PALETTE.map((c) => (
+                      {ACCENT_PAIRS.map((pair, i) => (
                         <button
-                          key={c}
+                          key={pair.light}
                           type="button"
-                          aria-label={`Colore ${c}`}
-                          onClick={() => setAccentColor(c)}
+                          aria-label={`Colore ${i + 1}`}
+                          aria-pressed={i === accentIdx}
+                          onClick={() => setAccentIndex(i)}
                           className={cn(
                             "size-8 rounded-full border transition-transform hover:scale-110",
-                            c === accent ? "border-foreground ring-2 ring-foreground/40" : "border-border",
+                            i === accentIdx ? "border-foreground ring-2 ring-foreground/40" : "border-border",
                           )}
-                          style={{ backgroundColor: c }}
+                          style={{ backgroundColor: isDark ? pair.dark : pair.light }}
                         />
                       ))}
                     </div>
