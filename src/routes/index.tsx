@@ -261,7 +261,7 @@ function looksLikeRealName(raw: string): boolean {
   const v = raw.trim();
   if (!v) return false;
   if (!/[a-zà-ÿ]/i.test(v)) return false; // nessuna lettera (es. "0")
-  if (/^settimana\s*\d+$/i.test(v)) return false; // "Settimana 1", "Settimana 2"...
+  if (/^settimana(\s*\d+)?$/i.test(v)) return false; // "Settimana", "Settimana 1", "Settimana 2"...
   if (v === v.toUpperCase()) return false; // tutto maiuscolo = intestazione/ruolo, non un nome
   return true;
 }
