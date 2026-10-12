@@ -70,6 +70,7 @@
   --app-date: #5c5c5c;
   --app-track: #ffffff;
   --app-upload: #003335;
+  --app-switch-off: #c7c7cc;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);
@@ -112,6 +113,7 @@
   --app-date: oklch(0.75 0.03 257);
   --app-track: oklch(0.38 0.04 260);
   --app-upload: #4f5f70;
+  --app-switch-off: #45556c;
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
   --card: oklch(0.208 0.042 265.755);
