@@ -38,24 +38,40 @@ export function applyTheme(pref: ThemePref): void {
  */
 export const themeInitScript = `(function(){try{var p=localStorage.getItem("${THEME_KEY}");var d=p==="dark"||(p!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;if(d)r.classList.add("dark");r.style.colorScheme=d?"dark":"light";var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",d?"${THEME_COLOR.dark}":"${THEME_COLOR.light}");}catch(e){}})();`;
 
-/** Preferenza corrente + funzione per cambiarla; con "system" segue anche i cambi del dispositivo. */
-export function useThemePref(): [ThemePref, (p: ThemePref) => void] {
+function resolveDark(pref: ThemePref): boolean {
+  return pref === "dark" || (pref === "system" && systemPrefersDark());
+}
+
+/**
+ * Preferenza corrente, funzione per cambiarla e tema effettivo in questo momento (true = scuro,
+ * anche quando la preferenza è "system" e dipende dal dispositivo). Con "system" segue anche i
+ * cambi del dispositivo.
+ */
+export function useThemePref(): [ThemePref, (p: ThemePref) => void, boolean] {
   const [pref, setPref] = useState<ThemePref>("system");
+  const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    setPref(readThemePref());
+    const p = readThemePref();
+    setPref(p);
+    setIsDark(resolveDark(p));
   }, []);
 
   useEffect(() => {
+    setIsDark(resolveDark(pref));
     if (pref !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => applyTheme("system");
+    const onChange = () => {
+      applyTheme("system");
+      setIsDark(mq.matches);
+    };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [pref]);
 
   const update = useCallback((p: ThemePref) => {
     setPref(p);
+    setIsDark(resolveDark(p));
     try {
       if (p === "system") localStorage.removeItem(THEME_KEY);
       else localStorage.setItem(THEME_KEY, p);
@@ -65,5 +81,5 @@ export function useThemePref(): [ThemePref, (p: ThemePref) => void] {
     applyTheme(p);
   }, []);
 
-  return [pref, update];
+  return [pref, update, isDark];
 }
