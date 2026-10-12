@@ -60,7 +60,7 @@ export function ShiftEditor({
   };
 
   const inputClass =
-    "box-border h-11 w-full rounded-xl border border-border px-2.5 text-[17px] text-foreground";
+    "box-border block h-11 w-full min-w-0 max-w-full appearance-none rounded-xl border border-border bg-clip-padding px-3 text-left text-[17px] text-foreground [-webkit-appearance:none]";
 
   return (
     <div className="rounded-2xl border border-border/60 bg-background p-5 shadow-lg">
@@ -97,7 +97,7 @@ export function ShiftEditor({
               aria-labelledby="shift-rest-label"
               onClick={() => setDraft({ ...draft, rest: !draft.rest })}
               className="relative h-8 w-[52px] shrink-0 rounded-full"
-              style={{ backgroundColor: draft.rest ? accent : "var(--app-track)" }}
+              style={{ backgroundColor: draft.rest ? accent : "var(--app-switch-off)" }}
             >
               <span
                 className="absolute top-[3px] size-[26px] rounded-full bg-white shadow"
@@ -106,8 +106,8 @@ export function ShiftEditor({
             </button>
           </div>
 
-          <div className={cn("flex gap-2.5", draft.rest && "pointer-events-none opacity-40")}>
-            <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
+          <div className={cn("grid grid-cols-2 gap-2.5", draft.rest && "pointer-events-none opacity-40")}>
+            <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
               Inizio
               <input
                 type="time"
@@ -117,7 +117,7 @@ export function ShiftEditor({
                 style={{ backgroundColor: "var(--app-chip)" }}
               />
             </label>
-            <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
+            <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
               Fine
               <input
                 type="time"
