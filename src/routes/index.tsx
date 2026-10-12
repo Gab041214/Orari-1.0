@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor } from "lucide-react";
+import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings } from "lucide-react";
 import { format, addDays, isToday, startOfMonth, endOfMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -48,6 +48,12 @@ const SELECTED_KEY = "turni.selected";
 const MONTH_KEY = "turni.month";
 const FILE_SUNDAY_KEY = "turni.fileSunday";
 const ACCENT_KEY = "turni.accent";
+
+const THEME_OPTIONS: { value: ThemePref; label: string; Icon: typeof Sun }[] = [
+  { value: "system", label: "Auto", Icon: Monitor },
+  { value: "light", label: "Chiaro", Icon: Sun },
+  { value: "dark", label: "Scuro", Icon: Moon },
+];
 
 const DEFAULT_ACCENT = "#00B5CE";
 /** Tavolozza colori per gradienti e badge totale ore. */
@@ -439,7 +445,7 @@ function Index() {
   );
   const [namesOpen, setNamesOpen] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [colorOpen, setColorOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [dayPopup, setDayPopup] = useState<{
     date: Date;
     apre: ShiftEntry[];
@@ -461,9 +467,6 @@ function Index() {
   };
   const fileRef = useRef<HTMLInputElement>(null);
   const [themePref, setThemePref] = useThemePref();
-  const nextTheme: Record<ThemePref, ThemePref> = { system: "light", light: "dark", dark: "system" };
-  const themeLabel: Record<ThemePref, string> = { system: "Tema: automatico", light: "Tema: chiaro", dark: "Tema: scuro" };
-  const ThemeIcon = themePref === "dark" ? Moon : themePref === "light" ? Sun : Monitor;
 
   // Blocca lo scroll della pagina sottostante mentre il menu nomi è aperto: il Popover, a
   // differenza del Dialog, non lo fa in automatico, quindi senza questo il gesto di scorrimento
@@ -786,26 +789,45 @@ function Index() {
                     </ul>
                   </PopoverContent>
                 </Popover>
-                <Popover open={colorOpen} onOpenChange={setColorOpen}>
+                <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      aria-label="Scegli colore"
-                      className="size-9 shrink-0 rounded-xl border border-border shadow-sm"
-                      style={{ backgroundColor: accent }}
-                    />
+                      aria-label="Impostazioni"
+                      title="Impostazioni"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm"
+                    >
+                      <Settings className="size-4" />
+                    </button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-auto rounded-2xl p-3">
+                  <PopoverContent align="end" className="w-64 rounded-2xl p-3">
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">Tema</p>
+                    <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1">
+                      {THEME_OPTIONS.map(({ value, label, Icon }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-label={`Tema ${label.toLowerCase()}`}
+                          aria-pressed={themePref === value}
+                          onClick={() => setThemePref(value)}
+                          className={cn(
+                            "flex h-8 items-center justify-center gap-1 rounded-lg text-xs text-foreground",
+                            themePref === value ? "bg-card shadow-sm" : "opacity-70",
+                          )}
+                        >
+                          <Icon className="size-3.5 shrink-0" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">Colore</p>
                     <div className="grid grid-cols-5 gap-2">
                       {PALETTE.map((c) => (
                         <button
                           key={c}
                           type="button"
                           aria-label={`Colore ${c}`}
-                          onClick={() => {
-                            setAccentColor(c);
-                            setColorOpen(false);
-                          }}
+                          onClick={() => setAccentColor(c)}
                           className={cn(
                             "size-8 rounded-full border transition-transform hover:scale-110",
                             c === accent ? "border-foreground ring-2 ring-foreground/40" : "border-border",
@@ -816,15 +838,6 @@ function Index() {
                     </div>
                   </PopoverContent>
                 </Popover>
-                <button
-                  type="button"
-                  aria-label={themeLabel[themePref]}
-                  title={themeLabel[themePref]}
-                  onClick={() => setThemePref(nextTheme[themePref])}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm"
-                >
-                  <ThemeIcon className="size-4" />
-                </button>
               </div>
             </div>
 
