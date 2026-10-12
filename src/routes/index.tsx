@@ -10,12 +10,23 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useThemePref, type ThemePref } from "@/lib/theme";
+import { ShiftEditor } from "@/components/shift-editor";
+import {
+  dayKey,
+  getOverride,
+  loadOverrides,
+  monthKey,
+  saveOverrides,
+  withOverride,
+  type OverrideStore,
+  type ShiftOverride,
+} from "@/lib/overrides";
+import { shiftFromTimes, toMinutes, type DayData } from "@/lib/shifts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -192,7 +203,7 @@ async function parseExcel(
 
 
 /** Restituisce nero o bianco per il massimo contrasto rispetto al colore esadecimale dato. */
-type ShiftEntry = { name: string; startLabel: string; endLabel: string; startMin: number; endMin: number };
+type ShiftEntry = { name: string; startLabel: string; endLabel: string; startMin: number; endMin: number; modified: boolean };
 
 const BASE_RANGE_START = 10 * 60;
 const BASE_RANGE_END = 20 * 60;
@@ -225,29 +236,7 @@ function contrastTextColor(hex: string): string {
   return luminance > 0.5 ? "#000000" : "#FFFFFF";
 }
 
-function toMinutes(value: string): number | null {
-  const m = value.match(/^(\d{1,2})[:.,]?(\d{2})?$/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = m[2] ? Number(m[2]) : 0;
-  if (h > 24 || min > 59) return null;
-  return h * 60 + min;
-}
-
-function formatHours(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m === 0 ? `${h}h` : `${h}h ${String(m).padStart(2, "0")}m`;
-}
-
-type DayData = {
-  start: string;
-  end: string;
-  total: string | null;
-  late: boolean;
-  shortShift: boolean;
-} | null;
-type WeekData = { monday: Date | undefined; days: DayData[] };
+type WeekData = { monday: Date | undefined; days: DayData[]; mods: boolean[] };
 
 /**
  * Confronta il nominativo del calendario con il valore della cella Excel in modo
@@ -291,6 +280,12 @@ function offsetMapForName(rows: string[][], name: string): Map<number, DayData> 
   return byOffset;
 }
 
+/** Applica un turno modificato a mano a quello del file (nessun turno se "a riposo"). */
+function applyOverride(base: DayData, ov: ShiftOverride | undefined): DayData {
+  if (!ov) return base;
+  return ov.rest ? null : shiftFromTimes(ov.start, ov.end);
+}
+
 function blockData(row: string[], cols: number[]): DayData {
   const values: string[] = [];
   for (const c of cols) {
@@ -298,25 +293,8 @@ function blockData(row: string[], cols: number[]): DayData {
     if (v !== "") values.push(v);
   }
   if (values.length === 0) return null;
-  const start = values[0] ?? "";
-  const end = values[values.length - 1] ?? "";
-
-  const s = toMinutes(start);
-  const e = toMinutes(end);
-  let total: string | null = null;
-  let shortShift = false;
-  if (s !== null && e !== null) {
-    let diff = e - s;
-    if (diff < 0) diff += 24 * 60;
-    if (diff > 8 * 60) diff -= 60;
-    const net = Math.max(diff, 0);
-    shortShift = net < 7 * 60;
-    total = formatHours(net);
-  }
-  const late = e !== null && e >= 20 * 60;
-  return { start, end, total, late, shortShift };
+  return shiftFromTimes(values[0] ?? "", values[values.length - 1] ?? "");
 }
-
 
 const SWIPE_ACTIONS_WIDTH = 80; // 2 pulsanti da 36px + gap 8px, allineati al bordo destro
 
@@ -439,6 +417,43 @@ function EntryRow({
   );
 }
 
+/** Riga del popup: nominativo, orari e barra; con il pallino se il turno è stato modificato a mano. */
+function ShiftRow({
+  entry,
+  range,
+  accent,
+}: {
+  entry: ShiftEntry;
+  range: { start: number; end: number };
+  accent: string;
+}) {
+  const { left, width } = barMetrics(entry.startMin, entry.endMin, range.start, range.end);
+  return (
+    <li
+      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground"
+      style={{ backgroundColor: "var(--app-chip)" }}
+    >
+      <span className="flex-1 truncate">{entry.name}</span>
+      {entry.modified && (
+        <span
+          role="img"
+          aria-label="Turno modificato"
+          className="size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: accent }}
+        />
+      )}
+      <span className="text-[10px] text-muted-foreground">{entry.startLabel}</span>
+      <div className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: "var(--app-track)" }}>
+        <div
+          className="absolute inset-y-0 rounded-full"
+          style={{ left: `${left}%`, width: `${width}%`, backgroundColor: accent }}
+        />
+      </div>
+      <span className="text-[10px] text-muted-foreground">{entry.endLabel}</span>
+    </li>
+  );
+}
+
 function Index() {
   const [rows, setRows] = useState<string[][]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -453,12 +468,9 @@ function Index() {
   const [namesOpen, setNamesOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dayPopup, setDayPopup] = useState<{
-    date: Date;
-    apre: ShiftEntry[];
-    chiude: ShiftEntry[];
-    barRange: { start: number; end: number };
-  } | null>(null);
+  const [popupDate, setPopupDate] = useState<Date | null>(null);
+  // Turni modificati a mano (per mese del file, giorno e nominativo); restano solo su questo dispositivo.
+  const [overrides, setOverrides] = useState<OverrideStore>({});
   const [newOption, setNewOption] = useState("");
   // Nominativi suggeriti dall'ultimo file caricato ma non ancora in elenco; "Ignora" li nasconde
   // finché non si carica un nuovo file (vedi reset in handleFile).
@@ -498,6 +510,7 @@ function Index() {
       if (raw) setOptions(JSON.parse(raw));
       const acc = Number(localStorage.getItem(ACCENT_KEY));
       if (Number.isInteger(acc) && acc >= 0 && acc < ACCENT_PAIRS.length) setAccentIdx(acc);
+      setOverrides(loadOverrides());
       const rawRows = localStorage.getItem(ROWS_KEY);
       if (rawRows) setRows(JSON.parse(rawRows));
       const name = localStorage.getItem(FILENAME_KEY);
@@ -576,6 +589,14 @@ function Index() {
     [referenceSunday],
   );
 
+  // Chiave del mese del file: senza un mese riconoscibile le modifiche manuali sono disattivate.
+  const monthK = month ? monthKey(month) : null;
+  const overrideFor = useMemo(
+    () => (date: Date, name: string): ShiftOverride | undefined =>
+      monthK ? getOverride(overrides, monthK, dayKey(date), name) : undefined,
+    [overrides, monthK],
+  );
+
   const weeks: WeekData[] = useMemo(() => {
     if (!selected || rows.length === 0) return [];
     const matching = rows.filter((r) => nameMatches(r[1] ?? "", selected));
@@ -606,13 +627,16 @@ function Index() {
       const w = j - 1;
       const mondayOffset = w * 7 + 1;
       const monday = gridStart ? addDays(gridStart, w * 7) : undefined;
-      const days = Array.from(
-        { length: 7 },
-        (_, i) => byOffset.get(mondayOffset + i) ?? null,
-      );
-      return { monday, days };
+      const mods: boolean[] = [];
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const fromFile = byOffset.get(mondayOffset + i) ?? null;
+        const ov = monday ? overrideFor(addDays(monday, i), selected) : undefined;
+        mods.push(!!ov);
+        return applyOverride(fromFile, ov);
+      });
+      return { monday, days, mods };
     });
-  }, [rows, selected, month, gridStart]);
+  }, [rows, selected, month, gridStart, overrideFor]);
 
 
   // Nominativi trovati nella colonna B del file ma non ancora presenti nell'elenco voci
@@ -643,20 +667,27 @@ function Index() {
 
   const openDayPopup = (date: Date | undefined) => {
     if (!date || !referenceSunday || rows.length === 0) return;
-    const offset = differenceInCalendarDays(date, referenceSunday);
+    setPopupDate(date);
+  };
+
+  // Elenchi "Apertura"/"Chiusura" del giorno aperto, ricalcolati anche quando cambia una modifica manuale.
+  const dayPopup = useMemo(() => {
+    if (!popupDate || !referenceSunday) return null;
+    const offset = differenceInCalendarDays(popupDate, referenceSunday);
     const dayEntries: ShiftEntry[] = [];
     for (const name of options) {
-      const data = peopleByOffset.get(name)?.get(offset);
+      const ov = overrideFor(popupDate, name);
+      const data = applyOverride(peopleByOffset.get(name)?.get(offset) ?? null, ov);
       if (!data) continue;
       const s = toMinutes(data.start);
       const e = toMinutes(data.end);
       if (s === null || e === null) continue;
-      dayEntries.push({ name, startLabel: data.start, endLabel: data.end, startMin: s, endMin: e });
+      dayEntries.push({ name, startLabel: data.start, endLabel: data.end, startMin: s, endMin: e, modified: !!ov });
     }
 
     const apre = dayEntries.filter((entry) => entry.startMin <= BASE_RANGE_START);
 
-    // "Chi chiude" è solo chi ha l'orario di chiusura più tardo di quel giorno specifico,
+    // "Chiusura" è solo chi ha l'orario di chiusura più tardo di quel giorno specifico,
     // non chiunque arrivi a una soglia fissa: se quel giorno c'è un turno fino alle 20:30,
     // chi chiude alle 20:00 lo stesso giorno non compare più nell'elenco.
     const maxEnd = dayEntries.reduce((max, entry) => Math.max(max, entry.endMin), 0);
@@ -666,14 +697,26 @@ function Index() {
     // prima resta comunque segnalato in lista, ma sulla barra parte dal bordo sinistro).
     // La fine invece è dinamica: si allarga oltre le 20:00 se quel giorno c'è un turno che
     // chiude più tardi (es. venerdì/sabato alle 20:30), qualunque sia l'orario esatto.
-    const barRange = {
-      start: BASE_RANGE_START,
-      end: Math.max(BASE_RANGE_END, maxEnd),
-    };
-    setDayPopup({ date, apre, chiude, barRange });
+    const barRange = { start: BASE_RANGE_START, end: Math.max(BASE_RANGE_END, maxEnd) };
+    return { date: popupDate, apre, chiude, barRange };
+  }, [popupDate, referenceSunday, options, peopleByOffset, overrideFor]);
+
+  // Turno del nominativo selezionato come scritto nel file, per il giorno aperto.
+  const selectedFileShift: DayData = useMemo(() => {
+    if (!popupDate || !referenceSunday || !selected) return null;
+    return offsetMapForName(rows, selected).get(differenceInCalendarDays(popupDate, referenceSunday)) ?? null;
+  }, [popupDate, referenceSunday, selected, rows]);
+
+  const changeOverride = (ov: ShiftOverride | null) => {
+    if (!monthK || !popupDate || !selected) return;
+    const next = withOverride(overrides, monthK, dayKey(popupDate), selected, ov);
+    setOverrides(next);
+    saveOverrides(next);
   };
 
-
+  const canEditShift = !!monthK && !!selected;
+  const dateCapitalized = (d: Date, pattern: string) =>
+    format(d, pattern, { locale: it }).replace(/^./, (c) => c.toUpperCase());
 
   return (
     <main className="min-h-screen pb-16" style={{ backgroundColor: "var(--app-bg)" }}>
@@ -937,6 +980,14 @@ function Index() {
                           {date ? format(date, "d", { locale: it }) : "—"}
                         </div>
                       </div>
+                      {week.mods[i] && (
+                        <span
+                          role="img"
+                          aria-label="Turno modificato"
+                          className="absolute right-1 top-1 z-20 size-[9px] rounded-full"
+                          style={{ backgroundColor: accent, boxShadow: "0 0 0 1.5px var(--app-week)" }}
+                        />
+                      )}
                       {data && (
                         <>
                           <article
@@ -984,81 +1035,51 @@ function Index() {
         )}
       </div>
 
-      <Dialog open={!!dayPopup} onOpenChange={(o) => !o && setDayPopup(null)}>
-        <DialogContent className="w-fit rounded-2xl" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle className="whitespace-nowrap text-sm font-normal">
-              {dayPopup
-                ? format(dayPopup.date, "EEEE d MMMM", { locale: it }).replace(/^./, (c) => c.toUpperCase())
-                : ""}
+      <Dialog open={!!dayPopup} onOpenChange={(o) => !o && setPopupDate(null)}>
+        <DialogContent
+          className="w-[344px] max-w-[calc(100vw-2rem)] gap-3.5 border-0 bg-transparent p-0 shadow-none sm:rounded-none"
+          showCloseButton={false}
+        >
+          <div className="rounded-2xl border border-border/60 bg-background p-5 shadow-lg">
+            <DialogTitle className="mb-3 whitespace-nowrap text-lg font-semibold leading-tight tracking-normal">
+              {dayPopup ? dateCapitalized(dayPopup.date, "EEEE d MMMM") : ""}
             </DialogTitle>
-          </DialogHeader>
 
-          <div>
-            <h3 className="mb-1.5 text-lg font-semibold text-foreground">Chi apre</h3>
+            <h3 className="mb-1.5 text-base font-normal text-foreground">Apertura</h3>
             {dayPopup && dayPopup.apre.length > 0 ? (
               <ul className="mb-4 space-y-1">
-                {dayPopup.apre.map((entry) => {
-                  const { left, width } = barMetrics(
-                    entry.startMin,
-                    entry.endMin,
-                    dayPopup.barRange.start,
-                    dayPopup.barRange.end,
-                  );
-                  return (
-                    <li
-                      key={entry.name}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground" style={{ backgroundColor: "var(--app-chip)" }}
-                    >
-                      <span className="flex-1 truncate">{entry.name}</span>
-                      <span className="text-[10px] text-muted-foreground">{entry.startLabel}</span>
-                      <div className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: "var(--app-track)" }}>
-                        <div
-                          className="absolute inset-y-0 rounded-full"
-                          style={{ left: `${left}%`, width: `${width}%`, backgroundColor: accent }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">{entry.endLabel}</span>
-                    </li>
-                  );
-                })}
+                {dayPopup.apre.map((entry) => (
+                  <ShiftRow key={entry.name} entry={entry} range={dayPopup.barRange} accent={accent} />
+                ))}
               </ul>
             ) : (
               <p className="mb-4 text-sm text-muted-foreground">Nessuno.</p>
             )}
 
-            <h3 className="mb-1.5 text-lg font-semibold text-foreground">Chi chiude</h3>
+            <h3 className="mb-1.5 text-base font-normal text-foreground">Chiusura</h3>
             {dayPopup && dayPopup.chiude.length > 0 ? (
               <ul className="space-y-1">
-                {dayPopup.chiude.map((entry) => {
-                  const { left, width } = barMetrics(
-                    entry.startMin,
-                    entry.endMin,
-                    dayPopup.barRange.start,
-                    dayPopup.barRange.end,
-                  );
-                  return (
-                    <li
-                      key={entry.name}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground" style={{ backgroundColor: "var(--app-chip)" }}
-                    >
-                      <span className="flex-1 truncate">{entry.name}</span>
-                      <span className="text-[10px] text-muted-foreground">{entry.startLabel}</span>
-                      <div className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: "var(--app-track)" }}>
-                        <div
-                          className="absolute inset-y-0 rounded-full"
-                          style={{ left: `${left}%`, width: `${width}%`, backgroundColor: accent }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">{entry.endLabel}</span>
-                    </li>
-                  );
-                })}
+                {dayPopup.chiude.map((entry) => (
+                  <ShiftRow key={entry.name} entry={entry} range={dayPopup.barRange} accent={accent} />
+                ))}
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground">Nessuno.</p>
             )}
           </div>
+
+          {dayPopup && canEditShift && (
+            <ShiftEditor
+              key={`${dayKey(dayPopup.date)}|${selected}`}
+              subtitle={`${selected} · ${dateCapitalized(dayPopup.date, "EEE d MMM")}`}
+              fileShift={selectedFileShift}
+              override={overrideFor(dayPopup.date, selected)}
+              accent={accent}
+              accentText={contrastTextColor(accent)}
+              onSave={(ov) => changeOverride(ov)}
+              onReset={() => changeOverride(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </main>
