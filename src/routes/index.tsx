@@ -1055,15 +1055,53 @@ function Index() {
                             {data.total && (
                               <span
                                 className={cn(
-                                  "w-full rounded-md px-1 py-[2px] text-center text-[10px] font-medium leading-none sm:rounded-xl sm:px-2 sm:py-[3px] sm:text-xs",
+                                  "flex w-full items-center justify-center gap-[3px] rounded-md px-1 py-[2px] text-center text-[10px] font-medium leading-none sm:gap-1 sm:rounded-xl sm:px-2 sm:py-[3px] sm:text-xs",
                                   data.late ? undefined : "bg-secondary text-foreground",
                                 )}
                                 style={data.late ? { backgroundColor: accent, color: contrastTextColor(accent) } : undefined}
                               >
+                                {data.ot && (
+                                  // Pallino: nella pillola colorata è "in sottrazione" (colore del fondo)
+                                  <span
+                                    aria-hidden
+                                    className="size-[5px] shrink-0 rounded-full sm:size-[7px]"
+                                    style={{ backgroundColor: data.late ? "var(--card)" : accent }}
+                                  />
+                                )}
                                 {data.total}
                               </span>
                             )}
                           </article>
+                          {data.ot && (
+                            <>
+                              {/* Zona di tocco del pallino: mostra le ore di straordinario */}
+                              <button
+                                type="button"
+                                data-peek
+                                aria-label="Mostra le ore di straordinario"
+                                aria-expanded={peekKey === `ot-${weekIdx}-${i}`}
+                                className="absolute bottom-0 left-0 z-30 h-[28px] w-1/2 rounded-lg sm:h-10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPeekKey(peekKey === `ot-${weekIdx}-${i}` ? null : `ot-${weekIdx}-${i}`);
+                                }}
+                              />
+                              {peekKey === `ot-${weekIdx}-${i}` && (
+                                <div
+                                  data-peek
+                                  role="status"
+                                  className={cn(
+                                    "absolute bottom-[34px] z-40 rounded-[10px] border border-border/60 bg-card px-[9px] py-1.5 text-foreground shadow-lg sm:bottom-[48px]",
+                                    i < 3 ? "left-0" : "right-0",
+                                  )}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="text-[10px] leading-tight text-muted-foreground">Straordinario</div>
+                                  <div className="whitespace-nowrap text-[13px] font-bold leading-snug">{data.ot.otTotal}</div>
+                                </div>
+                              )}
+                            </>
+                          )}
                           {/* Orari: posizione fissa, poco sotto al bordo superiore della tessera bassa */}
                           <div
                             className={cn(
