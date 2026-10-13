@@ -1055,8 +1055,9 @@ function Index() {
                             {data.total && (
                               <span
                                 className={cn(
-                                  "flex w-full items-center justify-center gap-[3px] rounded-md px-1 py-[2px] text-center text-[10px] font-medium leading-none sm:gap-1 sm:rounded-xl sm:px-2 sm:py-[3px] sm:text-xs",
+                                  "flex w-full items-center justify-center gap-[3px] whitespace-nowrap rounded-md px-1 py-[2px] text-center text-[10px] font-medium leading-none sm:gap-1 sm:rounded-xl sm:px-2 sm:py-[3px] sm:text-xs",
                                   data.late ? undefined : "bg-secondary text-foreground",
+                                  data.ot && "gap-[2px] px-0.5 text-[9px]",
                                 )}
                                 style={data.late ? { backgroundColor: accent, color: contrastTextColor(accent) } : undefined}
                               >
@@ -1068,7 +1069,7 @@ function Index() {
                                     style={{ backgroundColor: data.late ? "var(--card)" : accent }}
                                   />
                                 )}
-                                {data.total}
+                                <span>{data.total}</span>
                               </span>
                             )}
                           </article>
