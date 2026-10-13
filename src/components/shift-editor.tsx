@@ -166,7 +166,7 @@ export function DayEditPanels({
         </button>
 
         <div className="mt-1 flex flex-col gap-3">
-          <div className="text-[13px] text-muted-foreground">{subtitle}</div>
+          <div className="text-base text-muted-foreground">{subtitle}</div>
 
           <div className="flex min-h-11 items-center justify-between gap-3">
             <span id="shift-rest-label" className="text-[15px] text-foreground">
