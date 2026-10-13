@@ -1030,7 +1030,7 @@ function Index() {
                               data-peek
                               role="status"
                               className={cn(
-                                "absolute top-[36px] z-40 rounded-[10px] border border-border/60 bg-card px-[9px] py-1.5 text-foreground shadow-lg sm:top-[46px]",
+                                "absolute top-[36px] z-40 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none rounded-[10px] border border-border/60 bg-card px-[9px] py-1.5 text-foreground shadow-lg sm:top-[46px]",
                                 i < 3 ? "left-0" : "right-0",
                               )}
                               onClick={(e) => e.stopPropagation()}
@@ -1092,7 +1092,7 @@ function Index() {
                                   data-peek
                                   role="status"
                                   className={cn(
-                                    "absolute bottom-[34px] z-40 rounded-[10px] border border-border/60 bg-card px-[9px] py-1.5 text-foreground shadow-lg sm:bottom-[48px]",
+                                    "absolute bottom-[34px] z-40 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none rounded-[10px] border border-border/60 bg-card px-[9px] py-1.5 text-foreground shadow-lg sm:bottom-[48px]",
                                     i < 3 ? "left-0" : "right-0",
                                   )}
                                   onClick={(e) => e.stopPropagation()}
@@ -1153,7 +1153,7 @@ function Index() {
 
       <Dialog open={!!dayPopup} onOpenChange={(o) => !o && setPopupDate(null)}>
         <DialogContent
-          className="w-[344px] max-w-[calc(100vw-2rem)] gap-3.5 border-0 bg-transparent p-0 shadow-none sm:rounded-none"
+          className="top-[max(1rem,calc(50dvh-300px))] max-h-[calc(100dvh-2rem)] w-[360px] max-w-[calc(100vw-1rem)] translate-y-0 gap-3.5 overflow-y-auto border-0 bg-transparent px-2 pb-3 pt-0 shadow-none sm:rounded-none"
           showCloseButton={false}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
