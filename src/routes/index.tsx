@@ -15,18 +15,19 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useThemePref, type ThemePref } from "@/lib/theme";
-import { ShiftEditor } from "@/components/shift-editor";
+import { DayEditPanels } from "@/components/shift-editor";
 import {
   dayKey,
   getOverride,
+  hasShiftOverride,
   loadOverrides,
   monthKey,
   saveOverrides,
-  withOverride,
+  updateOverride,
+  type DayOverride,
   type OverrideStore,
-  type ShiftOverride,
 } from "@/lib/overrides";
-import { shiftFromTimes, toMinutes, type DayData } from "@/lib/shifts";
+import { overallTimes, shiftFromTimes, shiftWithOvertime, toMinutes, type DayData, type Overtime } from "@/lib/shifts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -280,10 +281,16 @@ function offsetMapForName(rows: string[][], name: string): Map<number, DayData> 
   return byOffset;
 }
 
-/** Applica un turno modificato a mano a quello del file (nessun turno se "a riposo"). */
-function applyOverride(base: DayData, ov: ShiftOverride | undefined): DayData {
+/**
+ * Applica le modifiche manuali al turno del file: prima l'orario ordinario inserito a mano
+ * (nessun turno se "a riposo"), poi l'eventuale straordinario agganciato all'ordinario.
+ * Con `withOvertime = false` restituisce solo l'ordinario.
+ */
+function applyOverride(base: DayData, ov: DayOverride | undefined, withOvertime = true): DayData {
   if (!ov) return base;
-  return ov.rest ? null : shiftFromTimes(ov.start, ov.end);
+  let data = base;
+  if (hasShiftOverride(ov)) data = ov.rest ? null : shiftFromTimes(ov.start ?? "", ov.end ?? "");
+  return withOvertime ? shiftWithOvertime(data, ov.ot) : data;
 }
 
 function blockData(row: string[], cols: number[]): DayData {
@@ -592,7 +599,7 @@ function Index() {
   // Chiave del mese del file: senza un mese riconoscibile le modifiche manuali sono disattivate.
   const monthK = month ? monthKey(month) : null;
   const overrideFor = useMemo(
-    () => (date: Date, name: string): ShiftOverride | undefined =>
+    () => (date: Date, name: string): DayOverride | undefined =>
       monthK ? getOverride(overrides, monthK, dayKey(date), name) : undefined,
     [overrides, monthK],
   );
@@ -631,7 +638,9 @@ function Index() {
       const days = Array.from({ length: 7 }, (_, i) => {
         const fromFile = byOffset.get(mondayOffset + i) ?? null;
         const ov = monday ? overrideFor(addDays(monday, i), selected) : undefined;
-        mods.push(!!ov);
+        // Il pallino sulla tessera segnala solo il turno ordinario modificato a mano: lo
+        // straordinario si riconosce già dai quattro orari.
+        mods.push(hasShiftOverride(ov));
         return applyOverride(fromFile, ov);
       });
       return { monday, days, mods };
@@ -679,10 +688,12 @@ function Index() {
       const ov = overrideFor(popupDate, name);
       const data = applyOverride(peopleByOffset.get(name)?.get(offset) ?? null, ov);
       if (!data) continue;
-      const s = toMinutes(data.start);
-      const e = toMinutes(data.end);
+      // Con lo straordinario contano il primo ingresso e l'ultima uscita del giorno.
+      const { start, end } = overallTimes(data);
+      const s = toMinutes(start);
+      const e = toMinutes(end);
       if (s === null || e === null) continue;
-      dayEntries.push({ name, startLabel: data.start, endLabel: data.end, startMin: s, endMin: e, modified: !!ov });
+      dayEntries.push({ name, startLabel: start, endLabel: end, startMin: s, endMin: e, modified: !!ov });
     }
 
     const apre = dayEntries.filter((entry) => entry.startMin <= BASE_RANGE_START);
@@ -707,9 +718,9 @@ function Index() {
     return offsetMapForName(rows, selected).get(differenceInCalendarDays(popupDate, referenceSunday)) ?? null;
   }, [popupDate, referenceSunday, selected, rows]);
 
-  const changeOverride = (ov: ShiftOverride | null) => {
+  const changeOverride = (change: (current: DayOverride) => DayOverride) => {
     if (!monthK || !popupDate || !selected) return;
-    const next = withOverride(overrides, monthK, dayKey(popupDate), selected, ov);
+    const next = updateOverride(overrides, monthK, dayKey(popupDate), selected, change);
     setOverrides(next);
     saveOverrides(next);
   };
@@ -1010,13 +1021,35 @@ function Index() {
                             )}
                           </article>
                           {/* Orari: posizione fissa, poco sotto al bordo superiore della tessera bassa */}
-                          <div className="absolute inset-x-0 top-[36px] z-10 flex flex-col items-center gap-0.5 px-1 text-center sm:top-[55px] sm:gap-1 sm:px-2">
-                            <span className="text-[12px] font-bold leading-tight text-foreground sm:text-base">
+                          <div
+                            className={cn(
+                              "absolute inset-x-0 z-10 flex flex-col items-center px-1 text-center sm:px-2",
+                              data.ot ? "top-[25px] gap-px sm:top-[46px] sm:gap-0.5" : "top-[36px] gap-0.5 sm:top-[55px] sm:gap-1",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "text-[12px] font-bold text-foreground sm:text-base",
+                                data.ot ? "leading-[1.1]" : "leading-tight",
+                              )}
+                            >
                               {data.start}
                             </span>
-                            <span className="text-[12px] font-bold leading-tight text-foreground sm:text-base">
+                            <span
+                              className={cn(
+                                "text-[12px] font-bold text-foreground sm:text-base",
+                                data.ot ? "leading-[1.1]" : "leading-tight",
+                              )}
+                            >
                               {data.end}
                             </span>
+                            {/* Straordinario: corpo più piccolo, sotto una linea sottile */}
+                            {data.ot && (
+                              <div className="mt-[2px] flex w-[70%] flex-col items-center border-t border-border/60 pt-[2px] text-[9px] font-medium leading-[1.1] text-foreground sm:mt-1 sm:pt-1 sm:text-[13px]">
+                                <span>{data.ot.start}</span>
+                                <span>{data.ot.end}</span>
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
@@ -1070,15 +1103,26 @@ function Index() {
           </div>
 
           {dayPopup && canEditShift && (
-            <ShiftEditor
+            <DayEditPanels
               key={`${dayKey(dayPopup.date)}|${selected}`}
               subtitle={`${selected} · ${dateCapitalized(dayPopup.date, "EEE d MMM")}`}
               fileShift={selectedFileShift}
+              ordinary={applyOverride(selectedFileShift, overrideFor(dayPopup.date, selected), false)}
               override={overrideFor(dayPopup.date, selected)}
               accent={accent}
               accentText={contrastTextColor(accent)}
-              onSave={(ov) => changeOverride(ov)}
-              onReset={() => changeOverride(null)}
+              onSaveShift={(shift) =>
+                changeOverride((cur) => ({
+                  rest: shift.rest,
+                  start: shift.start,
+                  end: shift.end,
+                  // Se il giorno passa a riposo lo straordinario non ha più un ordinario a cui agganciarsi.
+                  ot: shift.rest ? undefined : cur.ot,
+                }))
+              }
+              onResetShift={() => changeOverride((cur) => ({ ot: cur.ot }))}
+              onSaveOvertime={(ot: Overtime) => changeOverride((cur) => ({ ...cur, ot }))}
+              onRemoveOvertime={() => changeOverride((cur) => ({ rest: cur.rest, start: cur.start, end: cur.end }))}
             />
           )}
         </DialogContent>
