@@ -237,7 +237,7 @@ function contrastTextColor(hex: string): string {
   return luminance > 0.5 ? "#000000" : "#FFFFFF";
 }
 
-type WeekData = { monday: Date | undefined; days: DayData[]; mods: boolean[] };
+type WeekData = { monday: Date | undefined; days: DayData[]; mods: boolean[]; files: DayData[] };
 
 /**
  * Confronta il nominativo del calendario con il valore della cella Excel in modo
@@ -476,6 +476,8 @@ function Index() {
   const [adding, setAdding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [popupDate, setPopupDate] = useState<Date | null>(null);
+  // Tessera di cui è aperto il riquadro "Turno originale" (toccando il pallino): "settimana-giorno".
+  const [peekKey, setPeekKey] = useState<string | null>(null);
   // Turni modificati a mano (per mese del file, giorno e nominativo); restano solo su questo dispositivo.
   const [overrides, setOverrides] = useState<OverrideStore>({});
   const [newOption, setNewOption] = useState("");
@@ -508,6 +510,16 @@ function Index() {
       document.body.style.overflow = prev;
     };
   }, [namesOpen]);
+
+  // Il riquadro "Turno originale" si chiude toccando fuori dal pallino e dal riquadro stesso.
+  useEffect(() => {
+    if (!peekKey) return;
+    const onDown = (e: Event) => {
+      if (!(e.target instanceof Element) || !e.target.closest("[data-peek]")) setPeekKey(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [peekKey]);
 
   const [hydrated, setHydrated] = useState(false);
 
@@ -635,15 +647,17 @@ function Index() {
       const mondayOffset = w * 7 + 1;
       const monday = gridStart ? addDays(gridStart, w * 7) : undefined;
       const mods: boolean[] = [];
+      const files: DayData[] = [];
       const days = Array.from({ length: 7 }, (_, i) => {
         const fromFile = byOffset.get(mondayOffset + i) ?? null;
         const ov = monday ? overrideFor(addDays(monday, i), selected) : undefined;
         // Il pallino sulla tessera segnala solo il turno ordinario modificato a mano: lo
         // straordinario si riconosce già dai quattro orari.
         mods.push(hasShiftOverride(ov));
+        files.push(fromFile);
         return applyOverride(fromFile, ov);
       });
-      return { monday, days, mods };
+      return { monday, days, mods, files };
     });
   }, [rows, selected, month, gridStart, overrideFor]);
 
@@ -992,12 +1006,42 @@ function Index() {
                         </div>
                       </div>
                       {week.mods[i] && (
-                        <span
-                          role="img"
-                          aria-label="Turno modificato"
-                          className="absolute right-[8px] top-[13px] z-20 size-[9px] rounded-full sm:right-[14px] sm:top-[16px]"
-                          style={{ backgroundColor: accent, boxShadow: "0 0 0 1.5px var(--app-week)" }}
-                        />
+                        <>
+                          <span
+                            role="img"
+                            aria-label="Turno modificato"
+                            className="pointer-events-none absolute right-[8px] top-[13px] z-20 size-[9px] rounded-full sm:right-[14px] sm:top-[16px]"
+                            style={{ backgroundColor: accent, boxShadow: "0 0 0 1.5px var(--app-week)" }}
+                          />
+                          {/* Zona di tocco più ampia del pallino: mostra il turno scritto nel file */}
+                          <button
+                            type="button"
+                            data-peek
+                            aria-label="Mostra il turno originale"
+                            aria-expanded={peekKey === `${weekIdx}-${i}`}
+                            className="absolute right-0 top-[3px] z-30 size-[30px] rounded-lg sm:right-[6px] sm:top-[6px] sm:size-9"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPeekKey(peekKey === `${weekIdx}-${i}` ? null : `${weekIdx}-${i}`);
+                            }}
+                          />
+                          {peekKey === `${weekIdx}-${i}` && (
+                            <div
+                              data-peek
+                              role="status"
+                              className={cn(
+                                "absolute top-[36px] z-40 rounded-[10px] border border-border/60 bg-card px-[9px] py-1.5 text-foreground shadow-lg sm:top-[46px]",
+                                i < 3 ? "left-0" : "right-0",
+                              )}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="text-[10px] leading-tight text-muted-foreground">Turno originale</div>
+                              <div className="whitespace-nowrap text-[13px] font-bold leading-snug">
+                                {week.files[i] ? `${week.files[i]!.start} – ${week.files[i]!.end}` : "nessun turno"}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                       {data && (
                         <>
