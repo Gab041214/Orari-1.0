@@ -1,9 +1,17 @@
+export type OvertimeSide = "before" | "after";
+
+/** Straordinario agganciato all'orario ordinario: durata in minuti, prima o dopo il turno. */
+export type Overtime = { side: OvertimeSide; min: number };
+
 export type DayData = {
+  /** Orario ordinario. */
   start: string;
   end: string;
   total: string | null;
   late: boolean;
   shortShift: boolean;
+  /** Orari dello straordinario, se presente. */
+  ot?: { side: OvertimeSide; start: string; end: string };
 } | null;
 
 export function toMinutes(value: string): number | null {
@@ -49,4 +57,32 @@ export function shiftFromTimes(start: string, end: string): DayData {
   }
   const late = e !== null && e >= 20 * 60;
   return { start, end, total, late, shortShift };
+}
+
+/**
+ * Aggiunge lo straordinario a un turno: prima = finisce dove comincia l'ordinario, dopo = comincia
+ * dove finisce. Il totale è ordinario netto + straordinario, senza ricalcolare la pausa.
+ */
+export function shiftWithOvertime(base: DayData, ot: Overtime | undefined): DayData {
+  if (!base || !ot || ot.min <= 0) return base;
+  const s = toMinutes(base.start);
+  const e = toMinutes(base.end);
+  if (s === null || e === null) return base;
+  const day = 24 * 60;
+  const otStart = ot.side === "before" ? (((s - ot.min) % day) + day) % day : e;
+  const otEnd = ot.side === "before" ? s : (e + ot.min) % day;
+  const late = ot.side === "after" ? e + ot.min >= 20 * 60 : base.late;
+  return {
+    ...base,
+    total: formatHours(netMinutes(s, e) + ot.min),
+    late,
+    shortShift: false,
+    ot: { side: ot.side, start: minutesToTime(otStart), end: minutesToTime(otEnd) },
+  };
+}
+
+/** Primo ingresso e ultima uscita del giorno, straordinario compreso. */
+export function overallTimes(d: NonNullable<DayData>): { start: string; end: string } {
+  if (!d.ot) return { start: d.start, end: d.end };
+  return d.ot.side === "before" ? { start: d.ot.start, end: d.end } : { start: d.start, end: d.ot.end };
 }

@@ -1,10 +1,16 @@
 import { format } from "date-fns";
 
-/** Turno inserito a mano: `rest` = giorno senza turno. */
-export type ShiftOverride = { rest: boolean; start: string; end: string };
+import type { Overtime } from "@/lib/shifts";
 
-/** mese (yyyy-MM) -> giorno (yyyy-MM-dd) -> nominativo -> turno modificato */
-export type OverrideStore = Record<string, Record<string, Record<string, ShiftOverride>>>;
+/**
+ * Modifiche manuali di un giorno per un nominativo:
+ * - turno: `rest` è definito (true = giorno a riposo, false = orario `start`–`end` inserito a mano);
+ * - straordinario: `ot`, agganciato all'orario ordinario (quello del file o quello modificato).
+ */
+export type DayOverride = { rest?: boolean; start?: string; end?: string; ot?: Overtime };
+
+/** mese (yyyy-MM) -> giorno (yyyy-MM-dd) -> nominativo -> modifiche */
+export type OverrideStore = Record<string, Record<string, Record<string, DayOverride>>>;
 
 const OVERRIDES_KEY = "orari.overrides";
 
@@ -35,22 +41,26 @@ export function getOverride(
   month: string,
   day: string,
   name: string,
-): ShiftOverride | undefined {
+): DayOverride | undefined {
   return store[month]?.[day]?.[name];
 }
 
-/** Restituisce un nuovo store con il turno impostato (o rimosso se `ov` è null). */
-export function withOverride(
+/** True se il giorno ha un turno inserito a mano (anche "a riposo"). */
+export const hasShiftOverride = (ov: DayOverride | undefined): boolean => ov?.rest !== undefined;
+
+/** Restituisce un nuovo store con le modifiche del giorno cambiate da `change`; le voci vuote spariscono. */
+export function updateOverride(
   store: OverrideStore,
   month: string,
   day: string,
   name: string,
-  ov: ShiftOverride | null,
+  change: (current: DayOverride) => DayOverride,
 ): OverrideStore {
   const next: OverrideStore = { ...store };
   const days = { ...(next[month] ?? {}) };
   const names = { ...(days[day] ?? {}) };
-  if (ov) names[name] = ov;
+  const updated = change({ ...(names[name] ?? {}) });
+  if (updated.rest !== undefined || updated.ot) names[name] = updated;
   else delete names[name];
   if (Object.keys(names).length > 0) days[day] = names;
   else delete days[day];
