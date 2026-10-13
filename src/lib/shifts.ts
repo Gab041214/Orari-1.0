@@ -11,7 +11,7 @@ export type DayData = {
   late: boolean;
   shortShift: boolean;
   /** Orari dello straordinario, se presente. */
-  ot?: { side: OvertimeSide; start: string; end: string; ordTotal: string; otTotal: string };
+  ot?: { side: OvertimeSide; start: string; end: string };
 } | null;
 
 export function toMinutes(value: string): number | null {
@@ -77,13 +77,7 @@ export function shiftWithOvertime(base: DayData, ot: Overtime | undefined): DayD
     total: formatHours(netMinutes(s, e) + ot.min),
     late,
     shortShift: false,
-    ot: {
-      side: ot.side,
-      start: minutesToTime(otStart),
-      end: minutesToTime(otEnd),
-      ordTotal: formatHours(netMinutes(s, e)),
-      otTotal: `+${formatHours(ot.min)}`,
-    },
+    ot: { side: ot.side, start: minutesToTime(otStart), end: minutesToTime(otEnd) },
   };
 }
 
