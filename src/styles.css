@@ -66,6 +66,8 @@
   /* Colori specifici dell'app (sfondo pagina, cornice settimana, chip, date, barre) */
   --app-bg: #D8D8DE;
   --app-week: #ECECF0;
+  --app-tile: oklch(1 0 0);
+  --app-tile-chip: oklch(0.968 0.007 247.896);
   --app-chip: #E1E1E6;
   --app-date: #5c5c5c;
   --app-track: #ffffff;
@@ -109,6 +111,8 @@
   color-scheme: dark;
   --app-bg: oklch(0.129 0.042 264.695);
   --app-week: oklch(0.18 0.04 265);
+  --app-tile: oklch(0.27 0.04 265);
+  --app-tile-chip: oklch(0.37 0.04 262);
   --app-chip: oklch(0.279 0.041 260.031);
   --app-date: oklch(0.75 0.03 257);
   --app-track: oklch(0.38 0.04 260);
