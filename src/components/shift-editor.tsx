@@ -262,7 +262,7 @@ export function DayEditPanels({
   const info =
     preview && preview.ot
       ? `Straordinario ${preview.ot.start} – ${preview.ot.end}. Totale con ordinario: ${preview.total ?? ""}`
-      : "Inserisci la durata dello straordinario.";
+      : "";
 
   const segClass = "min-h-11 flex-1 rounded-xl text-[15px]";
   const segStyle = (on: boolean) =>
@@ -289,7 +289,7 @@ export function DayEditPanels({
       </button>
 
       <div className="mt-1 flex flex-col gap-3">
-        <div className="text-[13px] text-muted-foreground">{subtitle}</div>
+        <div className="text-base text-muted-foreground">{subtitle}</div>
 
         <div
           className="flex items-baseline justify-between rounded-xl px-3 py-2.5"
@@ -326,7 +326,7 @@ export function DayEditPanels({
         </div>
 
         <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
-          Durata dello straordinario (ore e minuti)
+          Inserisci la durata dello straordinario (ore e minuti)
           <input
             type="time"
             value={otDraft.dur}
@@ -336,7 +336,7 @@ export function DayEditPanels({
           />
         </label>
 
-        <div className="min-h-10 text-sm leading-snug text-muted-foreground">{info}</div>
+        {info && <div className="text-sm leading-snug text-muted-foreground">{info}</div>}
 
         <div className="flex gap-2">
           <button
