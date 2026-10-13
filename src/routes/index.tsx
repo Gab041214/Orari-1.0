@@ -994,7 +994,7 @@ function Index() {
                       onClick={() => openDayPopup(date)}
                     >
                       {/* Data: posizione fissa, indipendente dall'altezza della tessera */}
-                      <div className="absolute inset-x-0 top-2 z-10 pb-1 text-center">
+                      <div className="absolute inset-x-0 top-1 z-10 pb-1 text-center sm:top-2">
                         <div
                           className={cn(
                             "block truncate rounded-full px-2 text-[12px] sm:text-[16px]",
@@ -1107,7 +1107,7 @@ function Index() {
                           <div
                             className={cn(
                               "absolute inset-x-0 z-10 flex flex-col items-center px-1 text-center sm:px-2",
-                              data.ot ? "top-[25px] gap-px sm:top-[46px] sm:gap-0.5" : "top-[36px] gap-0.5 sm:top-[55px] sm:gap-1",
+                              data.ot ? "top-[21px] gap-px sm:top-[46px] sm:gap-0.5" : "top-[36px] gap-0.5 sm:top-[55px] sm:gap-1",
                             )}
                           >
                             <span
@@ -1128,7 +1128,7 @@ function Index() {
                             </span>
                             {/* Straordinario: corpo più piccolo, sotto una linea sottile */}
                             {data.ot && (
-                              <div className="mt-[2px] flex w-[70%] flex-col items-center border-t border-border/60 pt-[2px] text-[9px] font-medium leading-[1.1] text-foreground sm:mt-1 sm:pt-1 sm:text-[13px]">
+                              <div className="mt-px flex w-[70%] flex-col items-center border-t border-border/60 pt-px text-[9px] font-medium leading-[1.1] text-foreground sm:mt-1 sm:pt-1 sm:text-[13px]">
                                 <span>{data.ot.start}</span>
                                 <span>{data.ot.end}</span>
                               </div>
