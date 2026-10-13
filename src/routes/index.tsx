@@ -990,7 +990,7 @@ function Index() {
                   return (
                     <div
                       key={`${weekIdx}-${label}`}
-                      className="relative h-24 cursor-pointer sm:h-[148px]"
+                      className="@container relative h-24 cursor-pointer sm:h-[148px]"
                       onClick={() => openDayPopup(date)}
                     >
                       {/* Data: posizione fissa, indipendente dall'altezza della tessera */}
@@ -1010,7 +1010,7 @@ function Index() {
                           <span
                             role="img"
                             aria-label="Turno modificato"
-                            className="pointer-events-none absolute right-[8px] top-[13px] z-20 size-[9px] rounded-full sm:right-[14px] sm:top-[16px]"
+                            className="pointer-events-none absolute right-[8px] top-[13px] z-20 size-[9px] rounded-full @max-[45px]:right-[3px] @max-[45px]:size-[8px] sm:right-[14px] sm:top-[16px]"
                             style={{ backgroundColor: accent, boxShadow: "0 0 0 1.5px var(--app-week)" }}
                           />
                           {/* Zona di tocco più ampia del pallino: mostra il turno scritto nel file */}
