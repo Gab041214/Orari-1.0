@@ -1047,7 +1047,7 @@ function Index() {
                         <>
                           <article
                             className={cn(
-                              "absolute inset-x-0 bottom-0 flex flex-col items-center justify-end rounded-xl bg-card p-1 shadow-sm sm:rounded-2xl sm:p-2",
+                              "absolute inset-x-0 bottom-0 flex flex-col items-center justify-end rounded-xl bg-[var(--app-tile)] p-1 shadow-sm sm:rounded-2xl sm:p-2",
                               today ? "border-2 border-foreground" : "border border-border/60",
                             )}
                             style={{ height: data.shortShift ? "70%" : "100%" }}
@@ -1056,7 +1056,7 @@ function Index() {
                               <span
                                 className={cn(
                                   "flex w-full items-center justify-center gap-[3px] whitespace-nowrap rounded-md px-1 py-[2px] text-center text-[10px] font-medium leading-none sm:gap-1 sm:rounded-xl sm:px-2 sm:py-[3px] sm:text-xs",
-                                  data.late ? undefined : "bg-secondary text-foreground",
+                                  data.late ? undefined : "bg-[var(--app-tile-chip)] text-foreground",
                                   data.ot && "gap-[2px] px-0.5 text-[9px]",
                                 )}
                                 style={data.late ? { backgroundColor: accent, color: contrastTextColor(accent) } : undefined}
@@ -1066,7 +1066,7 @@ function Index() {
                                   <span
                                     aria-hidden
                                     className="size-[5px] shrink-0 rounded-full sm:size-[7px]"
-                                    style={{ backgroundColor: data.late ? "var(--card)" : accent }}
+                                    style={{ backgroundColor: data.late ? "var(--app-tile)" : accent }}
                                   />
                                 )}
                                 <span>{data.total}</span>
