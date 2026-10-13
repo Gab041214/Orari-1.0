@@ -40,7 +40,8 @@ function otDraftFrom(ot: Overtime | undefined, ordinary: DayData): OtDraft {
   return { side: start !== null && start <= 10 * 60 ? "after" : "before", dur: "00:00" };
 }
 
-const cardClass = "rounded-2xl border border-border/60 bg-background p-5 shadow-lg";
+const cardClass =
+  "rounded-2xl border border-border/60 bg-background p-5 shadow-lg animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none";
 const collapsedClass =
   "relative flex min-h-[60px] min-w-0 flex-1 items-center justify-between gap-1 rounded-2xl border border-border/60 bg-background pl-4 pr-3.5 text-left text-foreground shadow-lg disabled:opacity-40";
 const inputClass =
