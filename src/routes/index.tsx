@@ -1052,39 +1052,7 @@ function Index() {
                             )}
                             style={{ height: data.shortShift ? "70%" : "100%" }}
                           >
-                            {data.total && data.ot && (
-                              // Pillola divisa: ore ordinarie | straordinario. Il testo si rimpicciolisce
-                              // in base alla lunghezza per restare sempre intero.
-                              <div
-                                className="flex w-full gap-px overflow-hidden rounded-md sm:rounded-xl"
-                                style={{ containerType: "inline-size" }}
-                              >
-                                {[data.ot.ordTotal, data.ot.otTotal].map((label, k) => {
-                                  const n = data.ot!.ordTotal.length + data.ot!.otTotal.length;
-                                  return (
-                                    <span
-                                      key={k}
-                                      className={cn(
-                                        "flex-auto whitespace-nowrap px-px py-[2px] text-center leading-none sm:py-[3px]",
-                                        k === 1 && "font-bold",
-                                        data.late ? undefined : k === 0 ? "bg-secondary text-foreground" : undefined,
-                                      )}
-                                      style={{
-                                        fontSize: `min(10px, calc(157cqw / ${n}))`,
-                                        ...(data.late
-                                          ? { backgroundColor: accent, color: contrastTextColor(accent) }
-                                          : k === 1
-                                            ? { backgroundColor: `${accent}2e`, color: accent }
-                                            : undefined),
-                                      }}
-                                    >
-                                      {label}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            {data.total && !data.ot && (
+                            {data.total && (
                               <span
                                 className={cn(
                                   "w-full rounded-md px-1 py-[2px] text-center text-[10px] font-medium leading-none sm:rounded-xl sm:px-2 sm:py-[3px] sm:text-xs",
