@@ -56,7 +56,10 @@ export function shiftFromTimes(start: string, end: string): DayData {
     total = formatHours(net);
   }
   const late = e !== null && e >= 20 * 60;
-  return { start, end, total, late, shortShift };
+  // Orari mostrati sempre come HH:MM, qualunque formato abbia la cella del file (es. "10.00").
+  const label = (raw: string, min: number | null) =>
+    min === null ? raw : `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+  return { start: label(start, s), end: label(end, e), total, late, shortShift };
 }
 
 /**
