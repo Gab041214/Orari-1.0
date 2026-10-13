@@ -33,8 +33,11 @@ function draftFromShift(override: DayOverride | undefined, fileShift: DayData): 
   };
 }
 
-function otDraftFrom(ot: Overtime | undefined): OtDraft {
-  return ot ? { side: ot.side, dur: minutesToTime(ot.min) } : { side: "after", dur: "02:30" };
+/** Nuovo straordinario: durata a zero; lato "dopo" per i turni di apertura (inizio entro le 10:00), "prima" per gli altri. */
+function otDraftFrom(ot: Overtime | undefined, ordinary: DayData): OtDraft {
+  if (ot) return { side: ot.side, dur: minutesToTime(ot.min) };
+  const start = ordinary ? toMinutes(ordinary.start) : null;
+  return { side: start !== null && start <= 10 * 60 ? "after" : "before", dur: "00:00" };
 }
 
 const cardClass = "rounded-2xl border border-border/60 bg-background p-5 shadow-lg";
@@ -76,7 +79,7 @@ export function DayEditPanels({
 }) {
   const [panel, setPanel] = useState<Panel>("closed");
   const [draft, setDraft] = useState<ShiftDraft>(() => draftFromShift(override, fileShift));
-  const [otDraft, setOtDraft] = useState<OtDraft>(() => otDraftFrom(override?.ot));
+  const [otDraft, setOtDraft] = useState<OtDraft>(() => otDraftFrom(override?.ot, ordinary));
 
   const shiftModified = hasShiftOverride(override);
   const hasOt = !!override?.ot;
@@ -88,7 +91,7 @@ export function DayEditPanels({
   };
   const openOt = () => {
     if (!canOvertime) return;
-    setOtDraft(otDraftFrom(override?.ot));
+    setOtDraft(otDraftFrom(override?.ot, ordinary));
     setPanel("ot");
   };
   const close = () => setPanel("closed");
