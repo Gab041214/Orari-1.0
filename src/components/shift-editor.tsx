@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Minus, Undo2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -79,6 +79,13 @@ export function DayEditPanels({
   onRemoveOvertime: () => void;
 }) {
   const [panel, setPanel] = useState<Panel>("closed");
+  const cardRef = useRef<HTMLDivElement>(null);
+  // Su schermi bassi il pannello aperto può finire sotto il bordo: lo porta in vista solo se non è già visibile.
+  useEffect(() => {
+    if (panel === "closed") return;
+    const t = setTimeout(() => cardRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 230);
+    return () => clearTimeout(t);
+  }, [panel]);
   const [draft, setDraft] = useState<ShiftDraft>(() => draftFromShift(override, fileShift));
   const [otDraft, setOtDraft] = useState<OtDraft>(() => otDraftFrom(override?.ot, ordinary));
 
@@ -146,7 +153,7 @@ export function DayEditPanels({
         : "Inserisci inizio e fine del turno.";
 
     return (
-      <div className={cardClass}>
+      <div ref={cardRef} className={cardClass}>
         <button
           type="button"
           onClick={close}
@@ -270,7 +277,7 @@ export function DayEditPanels({
     on ? { backgroundColor: accent, color: accentText } : undefined;
 
   return (
-    <div className={cardClass}>
+    <div ref={cardRef} className={cardClass}>
       <button
         type="button"
         onClick={close}
