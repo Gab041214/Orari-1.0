@@ -1,17 +1,31 @@
 import { useState } from "react";
-import { ChevronDown, Undo2 } from "lucide-react";
+import { ChevronDown, Minus, Undo2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { type ShiftOverride } from "@/lib/overrides";
-import { formatHours, minutesToTime, netMinutes, toMinutes, type DayData } from "@/lib/shifts";
+import { hasShiftOverride, type DayOverride } from "@/lib/overrides";
+import {
+  formatHours,
+  minutesToTime,
+  netMinutes,
+  shiftWithOvertime,
+  toMinutes,
+  type DayData,
+  type Overtime,
+  type OvertimeSide,
+} from "@/lib/shifts";
 
-type Draft = { rest: boolean; start: string; end: string };
+type Panel = "closed" | "edit" | "ot";
+type ShiftDraft = { rest: boolean; start: string; end: string };
+type OtDraft = { side: OvertimeSide; dur: string };
 
-function draftFrom(source: ShiftOverride | DayData | undefined): Draft {
-  if (!source) return { rest: false, start: "", end: "" };
-  if ("rest" in source && source.rest) return { rest: true, start: "", end: "" };
-  const s = toMinutes(source.start);
-  const e = toMinutes(source.end);
+function draftFromShift(override: DayOverride | undefined, fileShift: DayData): ShiftDraft {
+  if (override && hasShiftOverride(override)) {
+    if (override.rest) return { rest: true, start: "", end: "" };
+    return { rest: false, start: override.start ?? "", end: override.end ?? "" };
+  }
+  if (!fileShift) return { rest: false, start: "", end: "" };
+  const s = toMinutes(fileShift.start);
+  const e = toMinutes(fileShift.end);
   return {
     rest: false,
     start: s === null ? "" : minutesToTime(s),
@@ -19,70 +33,134 @@ function draftFrom(source: ShiftOverride | DayData | undefined): Draft {
   };
 }
 
+function otDraftFrom(ot: Overtime | undefined): OtDraft {
+  return ot ? { side: ot.side, dur: minutesToTime(ot.min) } : { side: "after", dur: "02:30" };
+}
+
+const cardClass = "rounded-2xl border border-border/60 bg-background p-5 shadow-lg";
+const collapsedClass =
+  "relative flex min-h-[60px] min-w-0 flex-1 items-center justify-between gap-1 rounded-2xl border border-border/60 bg-background pl-4 pr-3.5 text-left text-foreground shadow-lg disabled:opacity-40";
+const inputClass =
+  "box-border flex h-11 w-full min-w-0 max-w-full appearance-none items-center rounded-xl border border-border bg-clip-padding px-3 py-0 text-left text-[17px] leading-none text-foreground [-webkit-appearance:none] [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:text-left";
+
 /**
- * Seconda finestra del popup del giorno: si espande toccando "Modifica turno" e permette di
- * cambiare a mano il turno del nominativo selezionato (o di segnarlo a riposo).
- * Va montata con una `key` diversa per ogni giorno/nominativo, così riparte chiusa.
+ * Finestre sotto "Apertura/Chiusura": "Modifica" (orario ordinario a mano) e "Straordinario"
+ * (ore aggiunte prima o dopo l'ordinario). Chiuse stanno affiancate a metà larghezza; aprendone
+ * una occupa tutta la larghezza e l'altra scompare. Va montata con una `key` diversa per ogni
+ * giorno/nominativo, così riparte chiusa.
  */
-export function ShiftEditor({
+export function DayEditPanels({
   subtitle,
   fileShift,
+  ordinary,
   override,
   accent,
   accentText,
-  onSave,
-  onReset,
+  onSaveShift,
+  onResetShift,
+  onSaveOvertime,
+  onRemoveOvertime,
 }: {
   subtitle: string;
+  /** Turno scritto nel file (null se il giorno è vuoto). */
   fileShift: DayData;
-  override: ShiftOverride | undefined;
+  /** Orario ordinario attuale (file o modificato a mano), senza straordinario; null se a riposo. */
+  ordinary: DayData;
+  override: DayOverride | undefined;
   accent: string;
   accentText: string;
-  onSave: (ov: ShiftOverride) => void;
-  onReset: () => void;
+  onSaveShift: (shift: ShiftDraft) => void;
+  onResetShift: () => void;
+  onSaveOvertime: (ot: Overtime) => void;
+  onRemoveOvertime: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(override ?? fileShift ?? undefined));
+  const [panel, setPanel] = useState<Panel>("closed");
+  const [draft, setDraft] = useState<ShiftDraft>(() => draftFromShift(override, fileShift));
+  const [otDraft, setOtDraft] = useState<OtDraft>(() => otDraftFrom(override?.ot));
 
-  const s = toMinutes(draft.start);
-  const e = toMinutes(draft.end);
-  const timesOk = s !== null && e !== null && draft.start !== draft.end;
-  const valid = draft.rest || timesOk;
-  const info = draft.rest
-    ? "Il giorno resterà senza turno."
-    : timesOk
-      ? `Ore lavorate: ${formatHours(netMinutes(s, e))}`
-      : "Inserisci inizio e fine del turno.";
+  const shiftModified = hasShiftOverride(override);
+  const hasOt = !!override?.ot;
+  const canOvertime = !!ordinary;
 
-  const toggle = () => {
-    if (!open) setDraft(draftFrom(override ?? fileShift ?? undefined));
-    setOpen(!open);
+  const openEdit = () => {
+    setDraft(draftFromShift(override, fileShift));
+    setPanel("edit");
   };
+  const openOt = () => {
+    if (!canOvertime) return;
+    setOtDraft(otDraftFrom(override?.ot));
+    setPanel("ot");
+  };
+  const close = () => setPanel("closed");
 
-  const inputClass =
-    "box-border flex h-11 w-full min-w-0 max-w-full appearance-none items-center rounded-xl border border-border bg-clip-padding px-3 py-0 text-left text-[17px] leading-none text-foreground [-webkit-appearance:none] [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:text-left";
-
-  return (
-    <div className="rounded-2xl border border-border/60 bg-background p-5 shadow-lg">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-md text-left text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <h3 className="text-lg font-semibold">Modifica turno</h3>
-        <span className="inline-flex items-center gap-2.5">
-          {override && (
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="size-2 rounded-full" style={{ backgroundColor: accent }} />
-              Modificato
-            </span>
+  if (panel === "closed") {
+    return (
+      <div className="flex gap-3.5">
+        <button type="button" onClick={openEdit} aria-expanded={false} className={collapsedClass}>
+          <span className="whitespace-nowrap text-base font-semibold">Modifica</span>
+          {shiftModified && (
+            <span
+              role="img"
+              aria-label="Turno modificato"
+              className="absolute right-2 top-2 size-2 rounded-full"
+              style={{ backgroundColor: accent }}
+            />
           )}
-          <ChevronDown className={cn("size-5 shrink-0 transition-transform", open && "rotate-180")} />
-        </span>
-      </button>
+          <ChevronDown className="size-4 shrink-0" />
+        </button>
+        <button
+          type="button"
+          onClick={openOt}
+          disabled={!canOvertime}
+          aria-expanded={false}
+          className={collapsedClass}
+        >
+          <span className="whitespace-nowrap text-base font-semibold">Straordinario</span>
+          {hasOt && (
+            <span
+              role="img"
+              aria-label="Con straordinario"
+              className="absolute right-2 top-2 size-2 rounded-full"
+              style={{ backgroundColor: accent }}
+            />
+          )}
+          <ChevronDown className="size-4 shrink-0" />
+        </button>
+      </div>
+    );
+  }
 
-      {open && (
+  if (panel === "edit") {
+    const s = toMinutes(draft.start);
+    const e = toMinutes(draft.end);
+    const timesOk = s !== null && e !== null && draft.start !== draft.end;
+    const valid = draft.rest || timesOk;
+    const info = draft.rest
+      ? "Il giorno resterà senza turno."
+      : timesOk
+        ? `Ore lavorate: ${formatHours(netMinutes(s, e))}`
+        : "Inserisci inizio e fine del turno.";
+
+    return (
+      <div className={cardClass}>
+        <button
+          type="button"
+          onClick={close}
+          aria-expanded
+          className="flex w-full items-center justify-between gap-2 rounded-md text-left text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <h3 className="text-lg font-semibold">Modifica turno</h3>
+          <span className="inline-flex items-center gap-2.5">
+            {shiftModified && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="size-2 rounded-full" style={{ backgroundColor: accent }} />
+                Modificato
+              </span>
+            )}
+            <ChevronDown className="size-5 shrink-0 rotate-180" />
+          </span>
+        </button>
+
         <div className="mt-1 flex flex-col gap-3">
           <div className="text-[13px] text-muted-foreground">{subtitle}</div>
 
@@ -134,7 +212,7 @@ export function ShiftEditor({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={close}
               className="min-h-11 flex-1 rounded-xl border border-border text-[15px] text-foreground"
             >
               Annulla
@@ -143,8 +221,8 @@ export function ShiftEditor({
               type="button"
               disabled={!valid}
               onClick={() => {
-                onSave(draft.rest ? { rest: true, start: "", end: "" } : { rest: false, start: draft.start, end: draft.end });
-                setOpen(false);
+                onSaveShift(draft.rest ? { rest: true, start: "", end: "" } : draft);
+                close();
               }}
               className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold disabled:opacity-40"
               style={{ backgroundColor: accent, color: accentText }}
@@ -153,12 +231,12 @@ export function ShiftEditor({
             </button>
           </div>
 
-          {override && (
+          {shiftModified && (
             <button
               type="button"
               onClick={() => {
-                onReset();
-                setOpen(false);
+                onResetShift();
+                close();
               }}
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-[15px] text-foreground"
             >
@@ -167,7 +245,133 @@ export function ShiftEditor({
             </button>
           )}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  // panel === "ot"
+  const durMin = toMinutes(otDraft.dur);
+  const otValid = !!ordinary && durMin !== null && durMin > 0;
+  const preview = otValid ? shiftWithOvertime(ordinary, { side: otDraft.side, min: durMin }) : null;
+  const ordStart = ordinary ? toMinutes(ordinary.start) : null;
+  const ordEnd = ordinary ? toMinutes(ordinary.end) : null;
+  const ordinaryHours = ordStart !== null && ordEnd !== null ? formatHours(netMinutes(ordStart, ordEnd)) : "";
+  const info =
+    preview && preview.ot
+      ? `Straordinario ${preview.ot.start} – ${preview.ot.end}. Totale con ordinario: ${preview.total ?? ""}`
+      : "Inserisci la durata dello straordinario.";
+
+  const segClass = "min-h-11 flex-1 rounded-xl text-[15px]";
+  const segStyle = (on: boolean) =>
+    on ? { backgroundColor: accent, color: accentText } : undefined;
+
+  return (
+    <div className={cardClass}>
+      <button
+        type="button"
+        onClick={close}
+        aria-expanded
+        className="flex w-full items-center justify-between gap-2 rounded-md text-left text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <h3 className="text-lg font-semibold">Straordinario</h3>
+        <span className="inline-flex items-center gap-2.5">
+          {hasOt && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="size-2 rounded-full" style={{ backgroundColor: accent }} />
+              Aggiunto
+            </span>
+          )}
+          <ChevronDown className="size-5 shrink-0 rotate-180" />
+        </span>
+      </button>
+
+      <div className="mt-1 flex flex-col gap-3">
+        <div className="text-[13px] text-muted-foreground">{subtitle}</div>
+
+        <div
+          className="flex items-baseline justify-between rounded-xl px-3 py-2.5"
+          style={{ backgroundColor: "var(--app-chip)" }}
+        >
+          <div>
+            <div className="text-xs text-muted-foreground">Orario ordinario</div>
+            <div className="text-[17px] font-semibold text-foreground">
+              {ordinary ? `${ordinary.start} – ${ordinary.end}` : ""}
+            </div>
+          </div>
+          <div className="text-sm text-muted-foreground">{ordinaryHours}</div>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            aria-pressed={otDraft.side === "before"}
+            onClick={() => setOtDraft({ ...otDraft, side: "before" })}
+            className={cn(segClass, otDraft.side === "before" ? "font-semibold" : "border border-border text-foreground")}
+            style={segStyle(otDraft.side === "before")}
+          >
+            Aggiungi prima
+          </button>
+          <button
+            type="button"
+            aria-pressed={otDraft.side === "after"}
+            onClick={() => setOtDraft({ ...otDraft, side: "after" })}
+            className={cn(segClass, otDraft.side === "after" ? "font-semibold" : "border border-border text-foreground")}
+            style={segStyle(otDraft.side === "after")}
+          >
+            Aggiungi dopo
+          </button>
+        </div>
+
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
+          Durata dello straordinario (ore e minuti)
+          <input
+            type="time"
+            value={otDraft.dur}
+            onChange={(ev) => setOtDraft({ ...otDraft, dur: ev.target.value })}
+            className={inputClass}
+            style={{ backgroundColor: "var(--app-chip)" }}
+          />
+        </label>
+
+        <div className="min-h-10 text-sm leading-snug text-muted-foreground">{info}</div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={close}
+            className="min-h-11 flex-1 rounded-xl border border-border text-[15px] text-foreground"
+          >
+            Annulla
+          </button>
+          <button
+            type="button"
+            disabled={!otValid}
+            onClick={() => {
+              if (!otValid || durMin === null) return;
+              onSaveOvertime({ side: otDraft.side, min: durMin });
+              close();
+            }}
+            className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold disabled:opacity-40"
+            style={{ backgroundColor: accent, color: accentText }}
+          >
+            Salva
+          </button>
+        </div>
+
+        {hasOt && (
+          <button
+            type="button"
+            onClick={() => {
+              onRemoveOvertime();
+              close();
+            }}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-[15px] text-foreground"
+          >
+            <Minus className="size-[18px]" aria-hidden="true" />
+            Rimuovi straordinario
+          </button>
+        )}
+      </div>
     </div>
   );
 }
