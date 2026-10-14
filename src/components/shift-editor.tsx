@@ -16,7 +16,7 @@ import {
 
 type Panel = "closed" | "edit" | "ot";
 type ShiftDraft = { rest: boolean; start: string; end: string };
-type OtDraft = { side: OvertimeSide; dur: string };
+type OtDraft = { side: OvertimeSide | "all"; dur: string };
 
 function draftFromShift(override: DayOverride | undefined, fileShift: DayData): ShiftDraft {
   if (override && hasShiftOverride(override)) {
@@ -35,7 +35,7 @@ function draftFromShift(override: DayOverride | undefined, fileShift: DayData): 
 
 /** Nuovo straordinario: durata a zero; lato "dopo" per i turni di apertura (inizio entro le 10:00), "prima" per gli altri. */
 function otDraftFrom(ot: Overtime | undefined, ordinary: DayData): OtDraft {
-  if (ot) return { side: ot.side, dur: minutesToTime(ot.min) };
+  if (ot) return ot.side === "all" ? { side: "all", dur: "00:00" } : { side: ot.side, dur: minutesToTime(ot.min) };
   const start = ordinary ? toMinutes(ordinary.start) : null;
   return { side: start !== null && start <= 10 * 60 ? "after" : "before", dur: "00:00" };
 }
@@ -262,8 +262,12 @@ export function DayEditPanels({
 
   // panel === "ot"
   const durMin = toMinutes(otDraft.dur);
-  const otValid = !!ordinary && durMin !== null && durMin > 0;
-  const preview = otValid ? shiftWithOvertime(ordinary, { side: otDraft.side, min: durMin }) : null;
+  const wholeShift = otDraft.side === "all";
+  const otValid = !!ordinary && (wholeShift || (durMin !== null && durMin > 0));
+  const preview =
+    otValid && !wholeShift && durMin !== null && otDraft.side !== "all"
+      ? shiftWithOvertime(ordinary, { side: otDraft.side, min: durMin })
+      : null;
   const ordStart = ordinary ? toMinutes(ordinary.start) : null;
   const ordEnd = ordinary ? toMinutes(ordinary.end) : null;
   const ordinaryHours = ordStart !== null && ordEnd !== null ? formatHours(netMinutes(ordStart, ordEnd)) : "";
@@ -272,7 +276,8 @@ export function DayEditPanels({
       ? `Straordinario ${preview.ot.start} – ${preview.ot.end}. Totale con ordinario: ${preview.total ?? ""}`
       : "";
 
-  const segClass = "min-h-11 flex-1 rounded-xl text-[15px]";
+  const segClass = "min-h-11 min-w-0 flex-1 whitespace-nowrap rounded-xl px-1 text-sm";
+  const dim = wholeShift ? "opacity-40" : "";
   const segStyle = (on: boolean) =>
     on ? { backgroundColor: accent, color: accentText } : undefined;
 
@@ -317,7 +322,7 @@ export function DayEditPanels({
             type="button"
             aria-pressed={otDraft.side === "before"}
             onClick={() => setOtDraft({ ...otDraft, side: "before" })}
-            className={cn(segClass, otDraft.side === "before" ? "font-semibold" : "border border-border text-foreground")}
+            className={cn(segClass, otDraft.side === "before" ? "font-semibold" : cn("border border-border text-foreground", dim))}
             style={segStyle(otDraft.side === "before")}
           >
             Aggiungi prima
@@ -326,23 +331,34 @@ export function DayEditPanels({
             type="button"
             aria-pressed={otDraft.side === "after"}
             onClick={() => setOtDraft({ ...otDraft, side: "after" })}
-            className={cn(segClass, otDraft.side === "after" ? "font-semibold" : "border border-border text-foreground")}
+            className={cn(segClass, otDraft.side === "after" ? "font-semibold" : cn("border border-border text-foreground", dim))}
             style={segStyle(otDraft.side === "after")}
           >
             Aggiungi dopo
           </button>
+          <button
+            type="button"
+            aria-pressed={wholeShift}
+            onClick={() => setOtDraft({ ...otDraft, side: "all" })}
+            className={cn(segClass, wholeShift ? "font-semibold" : "border border-border text-foreground")}
+            style={segStyle(wholeShift)}
+          >
+            Tutto il turno
+          </button>
         </div>
 
-        <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
-          Inserisci la durata dello straordinario (ore e minuti)
-          <input
-            type="time"
-            value={otDraft.dur}
-            onChange={(ev) => setOtDraft({ ...otDraft, dur: ev.target.value })}
-            className={inputClass}
-            style={{ backgroundColor: "var(--app-chip)" }}
-          />
-        </label>
+        {!wholeShift && (
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
+            Inserisci la durata dello straordinario (ore e minuti)
+            <input
+              type="time"
+              value={otDraft.dur}
+              onChange={(ev) => setOtDraft({ ...otDraft, dur: ev.target.value })}
+              className={inputClass}
+              style={{ backgroundColor: "var(--app-chip)" }}
+            />
+          </label>
+        )}
 
         {info && <div className="text-sm leading-snug text-muted-foreground">{info}</div>}
 
@@ -358,8 +374,9 @@ export function DayEditPanels({
             type="button"
             disabled={!otValid}
             onClick={() => {
-              if (!otValid || durMin === null) return;
-              onSaveOvertime({ side: otDraft.side, min: durMin });
+              if (!otValid) return;
+              if (otDraft.side === "all") onSaveOvertime({ side: "all" });
+              else if (durMin !== null) onSaveOvertime({ side: otDraft.side, min: durMin });
               close();
             }}
             className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold disabled:opacity-40"
