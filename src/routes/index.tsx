@@ -986,6 +986,8 @@ function Index() {
                 {DAY_LABELS.map((label, i) => {
                   const date = week.monday ? addDays(week.monday, i) : undefined;
                   const data = week.days[i];
+                  // Straordinario a blocco (prima/dopo): ha orari propri; "tutto il turno" no.
+                  const otBlock = !!data?.ot && data.ot.side !== "all";
                   const today = date ? isToday(date) : false;
                   return (
                     <div
@@ -1098,7 +1100,9 @@ function Index() {
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="text-[10px] leading-tight text-muted-foreground">Straordinario</div>
-                                  <div className="whitespace-nowrap text-[13px] font-bold leading-snug">{data.ot.otTotal}</div>
+                                  <div className="whitespace-nowrap text-[13px] font-bold leading-snug">
+                                    {data.ot.side === "all" ? `Tutto il turno · ${data.ot.otTotal}` : data.ot.otTotal}
+                                  </div>
                                 </div>
                               )}
                             </>
@@ -1107,13 +1111,13 @@ function Index() {
                           <div
                             className={cn(
                               "absolute inset-x-0 z-10 flex flex-col items-center px-1 text-center sm:px-2",
-                              data.ot ? "top-[21px] gap-px sm:top-[46px] sm:gap-0.5" : "top-[36px] gap-0.5 sm:top-[55px] sm:gap-1",
+                              otBlock ? "top-[21px] gap-px sm:top-[46px] sm:gap-0.5" : "top-[36px] gap-0.5 sm:top-[55px] sm:gap-1",
                             )}
                           >
                             <span
                               className={cn(
                                 "text-[12px] font-bold text-foreground sm:text-base",
-                                data.ot ? "leading-[1.1]" : "leading-tight",
+                                otBlock ? "leading-[1.1]" : "leading-tight",
                               )}
                             >
                               {data.start}
@@ -1121,13 +1125,13 @@ function Index() {
                             <span
                               className={cn(
                                 "text-[12px] font-bold text-foreground sm:text-base",
-                                data.ot ? "leading-[1.1]" : "leading-tight",
+                                otBlock ? "leading-[1.1]" : "leading-tight",
                               )}
                             >
                               {data.end}
                             </span>
                             {/* Straordinario: corpo più piccolo, sotto una linea sottile */}
-                            {data.ot && (
+                            {otBlock && data.ot && (
                               <div className="mt-px flex w-[70%] flex-col items-center border-t border-border/60 pt-px text-[9px] font-medium leading-[1.1] text-foreground sm:mt-1 sm:pt-1 sm:text-[13px]">
                                 <span>{data.ot.start}</span>
                                 <span>{data.ot.end}</span>
