@@ -1,7 +1,10 @@
 export type OvertimeSide = "before" | "after";
 
-/** Straordinario agganciato all'orario ordinario: durata in minuti, prima o dopo il turno. */
-export type Overtime = { side: OvertimeSide; min: number };
+/**
+ * Straordinario: un blocco di durata `min` prima o dopo l'orario ordinario, oppure ("all")
+ * l'intero turno considerato straordinario.
+ */
+export type Overtime = { side: OvertimeSide; min: number } | { side: "all" };
 
 export type DayData = {
   /** Orario ordinario. */
@@ -11,7 +14,7 @@ export type DayData = {
   late: boolean;
   shortShift: boolean;
   /** Orari dello straordinario, se presente. */
-  ot?: { side: OvertimeSide; start: string; end: string; otTotal: string };
+  ot?: { side: OvertimeSide | "all"; start: string; end: string; otTotal: string };
 } | null;
 
 export function toMinutes(value: string): number | null {
@@ -67,10 +70,15 @@ export function shiftFromTimes(start: string, end: string): DayData {
  * dove finisce. Il totale è ordinario netto + straordinario, senza ricalcolare la pausa.
  */
 export function shiftWithOvertime(base: DayData, ot: Overtime | undefined): DayData {
-  if (!base || !ot || ot.min <= 0) return base;
+  if (!base || !ot) return base;
   const s = toMinutes(base.start);
   const e = toMinutes(base.end);
   if (s === null || e === null) return base;
+  if (ot.side === "all") {
+    // Tutto il turno è straordinario: orari e totale restano quelli del turno.
+    return { ...base, ot: { side: "all", start: base.start, end: base.end, otTotal: formatHours(netMinutes(s, e)) } };
+  }
+  if (ot.min <= 0) return base;
   const day = 24 * 60;
   const otStart = ot.side === "before" ? (((s - ot.min) % day) + day) % day : e;
   const otEnd = ot.side === "before" ? s : (e + ot.min) % day;
@@ -91,6 +99,6 @@ export function shiftWithOvertime(base: DayData, ot: Overtime | undefined): DayD
 
 /** Primo ingresso e ultima uscita del giorno, straordinario compreso. */
 export function overallTimes(d: NonNullable<DayData>): { start: string; end: string } {
-  if (!d.ot) return { start: d.start, end: d.end };
+  if (!d.ot || d.ot.side === "all") return { start: d.start, end: d.end };
   return d.ot.side === "before" ? { start: d.ot.start, end: d.end } : { start: d.start, end: d.ot.end };
 }
