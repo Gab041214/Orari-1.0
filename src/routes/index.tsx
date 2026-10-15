@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText, ChevronRight } from "lucide-react";
+import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
 import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -16,7 +16,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useThemePref, type ThemePref } from "@/lib/theme";
 import { DayEditPanels } from "@/components/shift-editor";
-import { MonthOvertimePanel } from "@/components/month-overtime";
 import { buildMonthPdf, buildMonthReport, savePdf, type MonthRow } from "@/lib/month-report";
 import {
   dayKey,
@@ -764,6 +763,7 @@ function Index() {
   const generatePdf = () => {
     if (!hasMonth) return;
     setSettingsOpen(false);
+    setOvertimeOpen(false);
     const bytes = buildMonthPdf({
       monthLabel,
       person: selected,
@@ -900,7 +900,13 @@ function Index() {
                     </ul>
                   </PopoverContent>
                 </Popover>
-                <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <Popover
+                  open={settingsOpen}
+                  onOpenChange={(o) => {
+                    setSettingsOpen(o);
+                    if (!o) setOvertimeOpen(false);
+                  }}
+                >
                   <PopoverTrigger asChild>
                     <button
                       type="button"
@@ -950,19 +956,48 @@ function Index() {
                     </div>
                     <div className="-mx-3 my-3 h-px bg-border" />
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">Mese</p>
-                    <button
-                      type="button"
-                      disabled={!hasMonth}
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        setOvertimeOpen(true);
-                      }}
-                      className="mb-1.5 flex min-h-10 w-full items-center justify-between rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
-                      style={{ backgroundColor: "var(--app-chip)" }}
-                    >
-                      Straordinari del mese
-                      <ChevronRight className="size-3.5 shrink-0" />
-                    </button>
+                    <div className="mb-1.5 rounded-[10px]" style={{ backgroundColor: "var(--app-chip)" }}>
+                      <button
+                        type="button"
+                        disabled={!hasMonth}
+                        aria-expanded={overtimeOpen}
+                        onClick={() => setOvertimeOpen((o) => !o)}
+                        className="flex min-h-10 w-full items-center justify-between px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
+                      >
+                        Straordinari del mese
+                        <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", overtimeOpen && "rotate-180")} />
+                      </button>
+                      {overtimeOpen && hasMonth && (
+                        <div className="animate-in fade-in-0 slide-in-from-top-1 px-2.5 pb-2 duration-200 motion-reduce:animate-none">
+                          <p className="pb-0.5 text-xs text-muted-foreground">
+                            {selected} · {month ? format(month, "MMMM", { locale: it }).replace(/^./, (c) => c.toUpperCase()) : ""}
+                          </p>
+                          {monthReport.otRows.length > 0 ? (
+                            <>
+                              <ul>
+                                {monthReport.otRows.map((r) => (
+                                  <li
+                                    key={r.label}
+                                    className="flex min-h-8 items-center justify-between border-t border-border/60 text-sm text-foreground"
+                                  >
+                                    <span>{r.label}</span>
+                                    <span className="font-semibold">{r.hours}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              <div className="flex items-baseline justify-between border-t border-border/60 pt-2 text-foreground">
+                                <span className="text-sm font-semibold">Totale</span>
+                                <span className="text-base font-bold">{monthReport.otHours}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="border-t border-border/60 pt-2 text-sm text-muted-foreground">
+                              Nessuno straordinario in questo mese.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <button
                       type="button"
                       disabled={!hasMonth}
@@ -1031,15 +1066,6 @@ function Index() {
             </div>
           )}
         </section>
-
-        {overtimeOpen && hasMonth && (
-          <MonthOvertimePanel
-            onClose={() => setOvertimeOpen(false)}
-            subtitle={`${selected} · ${month ? format(month, "MMMM", { locale: it }).replace(/^./, (c) => c.toUpperCase()) : ""}`}
-            rows={monthReport.otRows}
-            total={monthReport.otHours}
-          />
-        )}
 
         {/* Month: one week per row, ciascuna settimana inscritta in una cornice */}
         <section className="mt-3 space-y-2">
