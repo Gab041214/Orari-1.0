@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
-import { format, addDays, isToday, startOfMonth, endOfMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
+import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
@@ -1124,11 +1124,17 @@ function Index() {
                   const data = week.days[i];
                   // Straordinario a blocco (prima/dopo): ha orari propri; "tutto il turno" no.
                   const otBlock = !!data?.ot && data.ot.side !== "all";
+                  // Giorni dei mesi vicini (stessa settimana): tinte attenuate, tranne con un riquadro aperto.
+                  const outside = !!date && !!month && !isSameMonth(date, month);
+                  const peekOpen = peekKey === `${weekIdx}-${i}` || peekKey === `ot-${weekIdx}-${i}`;
                   const today = date ? isToday(date) : false;
                   return (
                     <div
                       key={`${weekIdx}-${label}`}
-                      className="@container relative h-24 cursor-pointer sm:h-[148px]"
+                      className={cn(
+                        "@container relative h-24 cursor-pointer transition-opacity duration-200 sm:h-[148px]",
+                        outside && !peekOpen && "opacity-50",
+                      )}
                       onClick={() => openDayPopup(date)}
                     >
                       {/* Data: posizione fissa, indipendente dall'altezza della tessera */}
