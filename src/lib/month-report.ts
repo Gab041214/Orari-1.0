@@ -191,7 +191,8 @@ export async function savePdf(bytes: Uint8Array, filename: string): Promise<void
   const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
   if (nav.canShare?.({ files: [file] })) {
     try {
-      await nav.share({ files: [file], title: filename });
+      // Solo il file: con `title` o `text` iOS salva anche un secondo file di testo.
+      await nav.share({ files: [file] });
       return;
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
