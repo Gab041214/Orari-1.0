@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings } from "lucide-react";
-import { format, addDays, isToday, startOfMonth, endOfMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays } from "date-fns";
+import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText, ChevronRight } from "lucide-react";
+import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useThemePref, type ThemePref } from "@/lib/theme";
 import { DayEditPanels } from "@/components/shift-editor";
+import { MonthOvertimeDialog } from "@/components/month-overtime";
+import { buildMonthPdf, buildMonthReport, savePdf, type MonthRow } from "@/lib/month-report";
 import {
   dayKey,
   getOverride,
@@ -475,6 +477,7 @@ function Index() {
   const [namesOpen, setNamesOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [overtimeOpen, setOvertimeOpen] = useState(false);
   const [popupDate, setPopupDate] = useState<Date | null>(null);
   // Tessera di cui è aperto il riquadro "Turno originale" (toccando il pallino): "settimana-giorno".
   const [peekKey, setPeekKey] = useState<string | null>(null);
@@ -740,6 +743,36 @@ function Index() {
   };
 
   const canEditShift = !!monthK && !!selected;
+
+  // Giorni del mese del file (solo quelli del mese, non i giorni delle settimane vicine) con il turno finale.
+  const monthReport = useMemo(() => {
+    const days: MonthRow[] = [];
+    if (month) {
+      for (const week of weeks) {
+        const monday = week.monday;
+        if (!monday) continue;
+        week.days.forEach((data, i) => {
+          const date = addDays(monday, i);
+          if (isSameMonth(date, month)) days.push({ date, data });
+        });
+      }
+    }
+    return buildMonthReport(days);
+  }, [weeks, month]);
+  const monthLabel = month ? format(month, "MMMM yyyy", { locale: it }).replace(/^./, (c) => c.toUpperCase()) : "";
+  const hasMonth = !!month && !!selected && weeks.length > 0;
+  const generatePdf = () => {
+    if (!hasMonth) return;
+    setSettingsOpen(false);
+    const bytes = buildMonthPdf({
+      monthLabel,
+      person: selected,
+      report: monthReport,
+      generatedOn: format(new Date(), "dd/MM/yyyy"),
+    });
+    const safeName = selected.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "orari";
+    void savePdf(bytes, `Orari-${safeName}-${format(month!, "yyyy-MM")}.pdf`);
+  };
   const dateCapitalized = (d: Date, pattern: string) =>
     format(d, pattern, { locale: it }).replace(/^./, (c) => c.toUpperCase());
 
@@ -915,6 +948,31 @@ function Index() {
                         />
                       ))}
                     </div>
+                    <div className="-mx-3 my-3 h-px bg-border" />
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">Mese</p>
+                    <button
+                      type="button"
+                      disabled={!hasMonth}
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        setOvertimeOpen(true);
+                      }}
+                      className="mb-1.5 flex min-h-10 w-full items-center justify-between rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
+                      style={{ backgroundColor: "var(--app-chip)" }}
+                    >
+                      Straordinari del mese
+                      <ChevronRight className="size-3.5 shrink-0" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!hasMonth}
+                      onClick={generatePdf}
+                      className="flex min-h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
+                      style={{ backgroundColor: "var(--app-chip)" }}
+                    >
+                      <FileText className="size-4 shrink-0" />
+                      Genera PDF del mese
+                    </button>
                   </PopoverContent>
                 </Popover>
               </div>
@@ -1154,6 +1212,14 @@ function Index() {
           </p>
         )}
       </div>
+
+      <MonthOvertimeDialog
+        open={overtimeOpen}
+        onOpenChange={setOvertimeOpen}
+        subtitle={`${selected} · ${month ? format(month, "MMMM", { locale: it }).replace(/^./, (c) => c.toUpperCase()) : ""}`}
+        rows={monthReport.otRows}
+        total={monthReport.otHours}
+      />
 
       <Dialog open={!!dayPopup} onOpenChange={(o) => !o && setPopupDate(null)}>
         <DialogContent
