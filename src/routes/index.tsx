@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useThemePref, type ThemePref } from "@/lib/theme";
 import { DayEditPanels } from "@/components/shift-editor";
-import { MonthOvertimeDialog } from "@/components/month-overtime";
+import { MonthOvertimePanel } from "@/components/month-overtime";
 import { buildMonthPdf, buildMonthReport, savePdf, type MonthRow } from "@/lib/month-report";
 import {
   dayKey,
@@ -1032,6 +1032,15 @@ function Index() {
           )}
         </section>
 
+        {overtimeOpen && hasMonth && (
+          <MonthOvertimePanel
+            onClose={() => setOvertimeOpen(false)}
+            subtitle={`${selected} · ${month ? format(month, "MMMM", { locale: it }).replace(/^./, (c) => c.toUpperCase()) : ""}`}
+            rows={monthReport.otRows}
+            total={monthReport.otHours}
+          />
+        )}
+
         {/* Month: one week per row, ciascuna settimana inscritta in una cornice */}
         <section className="mt-3 space-y-2">
           {weeks.map((week, weekIdx) => (
@@ -1212,14 +1221,6 @@ function Index() {
           </p>
         )}
       </div>
-
-      <MonthOvertimeDialog
-        open={overtimeOpen}
-        onOpenChange={setOvertimeOpen}
-        subtitle={`${selected} · ${month ? format(month, "MMMM", { locale: it }).replace(/^./, (c) => c.toUpperCase()) : ""}`}
-        rows={monthReport.otRows}
-        total={monthReport.otHours}
-      />
 
       <Dialog open={!!dayPopup} onOpenChange={(o) => !o && setPopupDate(null)}>
         <DialogContent
