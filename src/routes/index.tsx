@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
-import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays } from "date-fns";
+import { format, addDays, isToday, startOfMonth, endOfMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useThemePref, type ThemePref } from "@/lib/theme";
 import { DayEditPanels } from "@/components/shift-editor";
 import { buildMonthPdf, buildMonthReport, savePdf, type MonthRow } from "@/lib/month-report";
+import { fileAnchor, loadFiles, saveFiles, trimFiles, type FileStore } from "@/lib/files";
 import {
   dayKey,
   getOverride,
@@ -53,13 +54,8 @@ export const Route = createFileRoute("/")({
 });
 
 const STORAGE_KEY = "turni.voci";
-const FILE_CACHE_NAME = "turni-file";
-// Sessione persistente: file caricato + selezioni, ripristinati alla riapertura
-const ROWS_KEY = "turni.file.rows";
-const FILENAME_KEY = "turni.file.name";
+// Sessione persistente: nominativo scelto, ripristinato alla riapertura (i file stanno in "orari.files")
 const SELECTED_KEY = "turni.selected";
-const MONTH_KEY = "turni.month";
-const FILE_SUNDAY_KEY = "turni.fileSunday";
 // Indice della coppia di colori scelta (vedi ACCENT_PAIRS); vale per entrambi i temi.
 const ACCENT_KEY = "turni.accentIndex";
 
@@ -81,30 +77,6 @@ const ACCENT_PAIRS: { light: string; dark: string }[] = [
   { light: "#900006", dark: "#EF3C2C" },
   { light: "#FEC200", dark: "#F6DC7D" },
 ];
-
-/**
- * Svuota la cache offline dei dati del file precedente.
- * Non tocca MAI l'elenco voci (STORAGE_KEY): quello si cancella solo dall'utente.
- */
-async function clearPreviousFileCache() {
-  try {
-    for (const storage of [localStorage, sessionStorage]) {
-      const keys = Object.keys(storage).filter(
-        (k) => k.startsWith("turni.file") && k !== STORAGE_KEY,
-      );
-      keys.forEach((k) => storage.removeItem(k));
-    }
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (typeof caches !== "undefined") {
-      await caches.delete(FILE_CACHE_NAME);
-    }
-  } catch {
-    /* ignore */
-  }
-}
 
 const DAY_LABELS = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
 // 1-based CSV column numbers per day (Mon..Sun)
@@ -174,8 +146,8 @@ async function parseExcel(
   const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
   // Domenica esatta della prima settimana, letta da SETUP!E7 (es. 30/08 per un file di settembre).
   const fileSunday = setupSunday(XLSX, wb);
-  // Priorità al mese/anno nel nome del file; fallback sul lunedì successivo a fileSunday.
-  const month = monthYearFromFileName(file.name) ?? (fileSunday ? startOfMonth(addDays(fileSunday, 1)) : undefined);
+  // Priorità al mese/anno nel nome del file; altrimenti il mese in cui cade la metà del file (domenica + 14 giorni).
+  const month = monthYearFromFileName(file.name) ?? (fileSunday ? startOfMonth(addDays(fileSunday, 14)) : undefined);
 
   const toRows = (name: string): string[][] =>
     (
@@ -185,7 +157,12 @@ async function parseExcel(
         defval: "",
         blankrows: false,
       }) as unknown[][]
-    ).map((r) => r.map((c) => String(c ?? "").trim()));
+    ).map((r) => {
+      const cells = r.map((c) => String(c ?? "").trim());
+      // Le celle vuote in coda non servono: si tolgono per occupare meno spazio.
+      while (cells.length > 0 && cells[cells.length - 1] === "") cells.pop();
+      return cells;
+    });
 
   // 1) foglio chiamato "Inserimento Orari"
   const sheetName = wb.SheetNames.find((n) => norm(n) === TARGET_TABLE);
@@ -463,10 +440,11 @@ function ShiftRow({
 }
 
 function Index() {
-  const [rows, setRows] = useState<string[][]>([]);
-  const [fileName, setFileName] = useState<string | null>(null);
+  // File dei turni ricordati (uno per mese, al massimo 12) e mese mostrato (all'apertura: quello di oggi).
+  const [files, setFiles] = useState<FileStore>({});
   const [month, setMonth] = useState<Date | undefined>(undefined);
-  const [fileSunday, setFileSunday] = useState<Date | undefined>(undefined);
+  // Esito dell'ultimo caricamento (file non riconosciuti).
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [selected, setSelected] = useState("");
   const [options, setOptions] = useState<string[]>([]);
   const sortedOptions = useMemo(
@@ -532,46 +510,30 @@ function Index() {
       const acc = Number(localStorage.getItem(ACCENT_KEY));
       if (Number.isInteger(acc) && acc >= 0 && acc < ACCENT_PAIRS.length) setAccentIdx(acc);
       setOverrides(loadOverrides());
-      const rawRows = localStorage.getItem(ROWS_KEY);
-      if (rawRows) setRows(JSON.parse(rawRows));
-      const name = localStorage.getItem(FILENAME_KEY);
-      if (name) setFileName(name);
+      setFiles(loadFiles());
       const sel = localStorage.getItem(SELECTED_KEY);
       if (sel) setSelected(sel);
-      const mon = localStorage.getItem(MONTH_KEY);
-      if (mon) {
-        const d = new Date(mon);
-        if (!Number.isNaN(d.getTime())) setMonth(startOfMonth(d));
-      }
-      const fs = localStorage.getItem(FILE_SUNDAY_KEY);
-      if (fs) {
-        const d = new Date(fs);
-        if (!Number.isNaN(d.getTime())) setFileSunday(d);
-      }
     } catch {
       /* ignore */
     }
+    setMonth(startOfMonth(new Date()));
     setHydrated(true);
   }, []);
 
   // Salva stato per la prossima apertura della PWA
   useEffect(() => {
     if (!hydrated) return;
+    saveFiles(files);
+  }, [hydrated, files]);
+  useEffect(() => {
+    if (!hydrated) return;
     try {
-      if (rows.length > 0) localStorage.setItem(ROWS_KEY, JSON.stringify(rows));
-      else localStorage.removeItem(ROWS_KEY);
-      if (fileName) localStorage.setItem(FILENAME_KEY, fileName);
-      else localStorage.removeItem(FILENAME_KEY);
       if (selected) localStorage.setItem(SELECTED_KEY, selected);
       else localStorage.removeItem(SELECTED_KEY);
-      if (month) localStorage.setItem(MONTH_KEY, month.toISOString());
-      else localStorage.removeItem(MONTH_KEY);
-      if (fileSunday) localStorage.setItem(FILE_SUNDAY_KEY, fileSunday.toISOString());
-      else localStorage.removeItem(FILE_SUNDAY_KEY);
     } catch {
-      /* quota superata: ignora */
+      /* ignore */
     }
-  }, [hydrated, rows, fileName, selected, month, fileSunday]);
+  }, [hydrated, selected]);
 
   const persist = (next: string[]) => {
     setOptions(next);
@@ -582,87 +544,155 @@ function Index() {
     }
   };
 
-  const handleFile = async (file: File) => {
-    // svuota la cache offline del file precedente prima di prendere in carico il nuovo
-    await clearPreviousFileCache();
-    setRows([]);
-    setFileName(null);
+  // Carica uno o più file: ognuno va al suo mese (quello nel nome del file) e sostituisce l'eventuale file dello stesso mese.
+  const handleFiles = async (list: File[]) => {
     setDismissedSuggestions(new Set());
-    const parsed = await parseExcel(file);
-    setRows(parsed.rows);
-    setMonth(parsed.month);
-    setFileSunday(parsed.fileSunday);
-    setFileName(file.name);
+    setUploadNote(null);
+    const unknown: string[] = [];
+    let next: FileStore = { ...files };
+    let lastMonth: Date | undefined;
+    for (const file of list) {
+      try {
+        const parsed = await parseExcel(file);
+        if (!parsed.month || parsed.rows.length === 0) {
+          unknown.push(file.name);
+          continue;
+        }
+        next[monthKey(parsed.month)] = {
+          name: file.name,
+          month: parsed.month.toISOString(),
+          sunday: parsed.fileSunday?.toISOString(),
+          rows: parsed.rows,
+        };
+        if (!lastMonth || parsed.month > lastMonth) lastMonth = parsed.month;
+      } catch {
+        unknown.push(file.name);
+      }
+    }
+    next = trimFiles(next);
+    setFiles(next);
+    if (lastMonth) setMonth(startOfMonth(lastMonth));
+    if (unknown.length > 0) {
+      setUploadNote(`Non riesco a capire il mese di: ${unknown.join(", ")}. Controlla che nel nome ci sia il mese e l'anno.`);
+    }
   };
 
-  // Domenica di riferimento: l'ancora ESATTA letta da SETUP!E7 (anche se ricade nel mese
-  // precedente, es. 30/08 per un file di settembre). Se il file non la fornisce, si ricade
-  // sul calcolo basato sul mese (giorno prima del primo lunedì della griglia).
-  const referenceSunday = useMemo(() => {
-    if (fileSunday) return fileSunday;
-    if (!month) return undefined;
-    return addDays(startOfWeek(startOfMonth(month), { weekStartsOn: 1 }), -1);
-  }, [fileSunday, month]);
-
-  // Primo lunedì visualizzato: il giorno subito dopo la domenica di riferimento.
-  const gridStart = useMemo(
-    () => (referenceSunday ? addDays(referenceSunday, 1) : undefined),
-    [referenceSunday],
-  );
-
-  // Chiave del mese del file: senza un mese riconoscibile le modifiche manuali sono disattivate.
   const monthK = month ? monthKey(month) : null;
-  const overrideFor = useMemo(
-    () => (date: Date, name: string): DayOverride | undefined =>
-      monthK ? getOverride(overrides, monthK, dayKey(date), name) : undefined,
-    [overrides, monthK],
+  const hasFiles = Object.keys(files).length > 0;
+  // File del mese mostrato (o, se manca, l'ultimo caricato): da qui vengono nominativi suggeriti e nome del file.
+  const currentFile = useMemo(() => {
+    if (monthK && files[monthK]) return files[monthK];
+    const keys = Object.keys(files).sort();
+    return keys.length > 0 ? files[keys[keys.length - 1]!] : undefined;
+  }, [files, monthK]);
+  const rows = useMemo(() => currentFile?.rows ?? [], [currentFile]);
+  const fileName = currentFile?.name ?? null;
+
+  // File ordinati con la loro domenica di partenza.
+  const fileList = useMemo(
+    () => Object.entries(files).map(([key, f]) => ({ key, rows: f.rows, anchor: fileAnchor(f) })),
+    [files],
+  );
+  // Per ogni file e nominativo: giorno (offset dalla domenica di partenza) -> turno.
+  const mapsByFile = useMemo(() => {
+    const names = selected && !options.includes(selected) ? [...options, selected] : options;
+    const all = new Map<string, Map<string, Map<number, DayData>>>();
+    for (const f of fileList) {
+      const perName = new Map<string, Map<number, DayData>>();
+      for (const name of names) perName.set(name, offsetMapForName(f.rows, name));
+      all.set(f.key, perName);
+    }
+    return all;
+  }, [fileList, options, selected]);
+
+  // Turno di un nominativo in una data, preso dal file giusto: prima quello del mese della data, poi gli altri.
+  const resolveDay = useMemo(
+    () =>
+      (name: string, date: Date): { data: DayData; fileKey: string } | null => {
+        const dk = monthKey(date);
+        let best: { data: DayData; fileKey: string; rank: number; anchor: number } | null = null;
+        for (const f of fileList) {
+          const map = mapsByFile.get(f.key)?.get(name);
+          const off = differenceInCalendarDays(date, f.anchor);
+          if (!map || !map.has(off)) continue;
+          const rank = f.key === dk ? 1 : 0;
+          const anchor = f.anchor.getTime();
+          if (!best || rank > best.rank || (rank === best.rank && anchor > best.anchor)) {
+            best = { data: map.get(off) ?? null, fileKey: f.key, rank, anchor };
+          }
+        }
+        return best ? { data: best.data, fileKey: best.fileKey } : null;
+      },
+    [fileList, mapsByFile],
   );
 
-  const weeks: WeekData[] = useMemo(() => {
-    if (!selected || rows.length === 0) return [];
-    const matching = rows.filter((r) => nameMatches(r[1] ?? "", selected));
-
-    // Each CSV row covers Sunday -> Saturday starting from the reference Sunday.
-    // key = day offset from the reference Sunday
-    const byOffset = new Map<number, DayData>();
-    matching.forEach((row, i) => {
-      const base = i * 7;
-      // Sunday block (cols 3-6) is the first day of the row
-      byOffset.set(base, blockData(row, DAY_BLOCKS[6]!));
-      // Monday..Saturday follow the next days
-      for (let d = 0; d < 6; d++) {
-        byOffset.set(base + 1 + d, blockData(row, DAY_BLOCKS[d]!));
+  // Modifiche manuali: stanno sotto il mese del file da cui viene il giorno; se non ci sono lì si cerca negli altri.
+  const overrideFor = useMemo(
+    () => (date: Date, name: string): DayOverride | undefined => {
+      const day = dayKey(date);
+      const own = resolveDay(name, date)?.fileKey ?? monthKey(date);
+      const found = getOverride(overrides, own, day, name);
+      if (found) return found;
+      for (const k of Object.keys(overrides)) {
+        const other = getOverride(overrides, k, day, name);
+        if (other) return other;
       }
-    });
+      return undefined;
+    },
+    [overrides, resolveDay],
+  );
 
-    // Displayed weeks run Monday -> Sunday and cover the selected month.
-    const weekCount =
-      gridStart && month
-        ? differenceInCalendarWeeks(endOfMonth(month), gridStart, { weekStartsOn: 1 }) + 1
-        : matching.length + 1;
-
-    // +1 settimana di testa (w=-1): mostra la Domenica di riferimento (offset0, letta da
-    // SETUP!E7), che cade il giorno prima del primo lunedì visualizzato e altrimenti non
-    // rientrerebbe in nessuna settimana della griglia.
-    return Array.from({ length: weekCount + 1 }, (_, j) => {
-      const w = j - 1;
-      const mondayOffset = w * 7 + 1;
-      const monday = gridStart ? addDays(gridStart, w * 7) : undefined;
+  // Calendario del mese mostrato: settimane da lunedì a domenica, giorno per giorno dal file giusto.
+  const gridStart = useMemo(
+    () => (month ? startOfWeek(startOfMonth(month), { weekStartsOn: 1 }) : undefined),
+    [month],
+  );
+  const weeks: WeekData[] = useMemo(() => {
+    if (!selected || !month || !gridStart || fileList.length === 0) return [];
+    const weekCount = differenceInCalendarWeeks(endOfMonth(month), gridStart, { weekStartsOn: 1 }) + 1;
+    return Array.from({ length: weekCount }, (_, w) => {
+      const monday = addDays(gridStart, w * 7);
       const mods: boolean[] = [];
-      const files: DayData[] = [];
+      const fileShifts: DayData[] = [];
       const days = Array.from({ length: 7 }, (_, i) => {
-        const fromFile = byOffset.get(mondayOffset + i) ?? null;
-        const ov = monday ? overrideFor(addDays(monday, i), selected) : undefined;
+        const date = addDays(monday, i);
+        const fromFile = resolveDay(selected, date)?.data ?? null;
+        const ov = overrideFor(date, selected);
         // Il pallino sulla tessera segnala solo il turno ordinario modificato a mano: lo
         // straordinario si riconosce già dai quattro orari.
         mods.push(hasShiftOverride(ov));
-        files.push(fromFile);
+        fileShifts.push(fromFile);
         return applyOverride(fromFile, ov);
       });
-      return { monday, days, mods, files };
+      return { monday, days, mods, files: fileShifts };
     });
-  }, [rows, selected, month, gridStart, overrideFor]);
+  }, [selected, month, gridStart, fileList, resolveDay, overrideFor]);
 
+  // Avvisi sui file mancanti: manca il file del mese, oppure ci sono i giorni iniziali non coperti da nessun file.
+  const notice = useMemo(() => {
+    if (!month || !monthK || !selected || !hasFiles) return null;
+    const monthName = format(month, "MMMM", { locale: it });
+    if (!files[monthK]) {
+      return {
+        text: `Manca il file di ${monthName}. Carica il file per vedere tutti i turni del mese.`,
+        partial: `Totale parziale: manca il file di ${monthName}.`,
+      };
+    }
+    // Giorni iniziali del mese non coperti da nessun file (se il nominativo è nel file del mese).
+    let missing = 0;
+    const days = getDaysInMonth(month);
+    for (let d = 1; d <= days; d++) {
+      if (resolveDay(selected, new Date(month.getFullYear(), month.getMonth(), d))) break;
+      missing++;
+    }
+    if (missing === 0 || missing === days) return null;
+    const prev = format(subMonths(month, 1), "MMMM", { locale: it });
+    const range = missing === 1 ? "il giorno 1" : `i giorni 1–${missing}`;
+    return {
+      text: `Mancano ${range} ${monthName}: ${missing === 1 ? "è" : "sono"} nel file di ${prev}.`,
+      partial: `Totale parziale: mancano ${range}.`,
+    };
+  }, [month, monthK, selected, hasFiles, files, resolveDay]);
 
   // Nominativi trovati nella colonna B del file ma non ancora presenti nell'elenco voci
   // (né coperti, anche parzialmente, da uno già presente) e non ignorati dall'utente.
@@ -681,28 +711,18 @@ function Index() {
     return candidates.filter((name) => !options.some((o) => nameMatches(name, o)));
   }, [rows, options, dismissedSuggestions]);
 
-  // Mappa offset -> turno per ogni nominativo presente nell'elenco voci (non solo il selezionato).
-  const peopleByOffset = useMemo(() => {
-    const map = new Map<string, Map<number, DayData>>();
-    for (const name of options) {
-      map.set(name, offsetMapForName(rows, name));
-    }
-    return map;
-  }, [rows, options]);
-
   const openDayPopup = (date: Date | undefined) => {
-    if (!date || !referenceSunday || rows.length === 0) return;
+    if (!date || !hasFiles) return;
     setPopupDate(date);
   };
 
   // Elenchi "Apertura"/"Chiusura" del giorno aperto, ricalcolati anche quando cambia una modifica manuale.
   const dayPopup = useMemo(() => {
-    if (!popupDate || !referenceSunday) return null;
-    const offset = differenceInCalendarDays(popupDate, referenceSunday);
+    if (!popupDate) return null;
     const dayEntries: ShiftEntry[] = [];
     for (const name of options) {
       const ov = overrideFor(popupDate, name);
-      const data = applyOverride(peopleByOffset.get(name)?.get(offset) ?? null, ov);
+      const data = applyOverride(resolveDay(name, popupDate)?.data ?? null, ov);
       if (!data) continue;
       // Con lo straordinario contano il primo ingresso e l'ultima uscita del giorno.
       const { start, end } = overallTimes(data);
@@ -726,40 +746,47 @@ function Index() {
     // chiude più tardi (es. venerdì/sabato alle 20:30), qualunque sia l'orario esatto.
     const barRange = { start: BASE_RANGE_START, end: Math.max(BASE_RANGE_END, maxEnd) };
     return { date: popupDate, apre, chiude, barRange };
-  }, [popupDate, referenceSunday, options, peopleByOffset, overrideFor]);
+  }, [popupDate, options, resolveDay, overrideFor]);
 
   // Turno del nominativo selezionato come scritto nel file, per il giorno aperto.
   const selectedFileShift: DayData = useMemo(() => {
-    if (!popupDate || !referenceSunday || !selected) return null;
-    return offsetMapForName(rows, selected).get(differenceInCalendarDays(popupDate, referenceSunday)) ?? null;
-  }, [popupDate, referenceSunday, selected, rows]);
+    if (!popupDate || !selected) return null;
+    return resolveDay(selected, popupDate)?.data ?? null;
+  }, [popupDate, selected, resolveDay]);
 
+  // Le modifiche si salvano sotto il mese del file da cui viene il giorno, e si tolgono dagli altri mesi.
   const changeOverride = (change: (current: DayOverride) => DayOverride) => {
-    if (!monthK || !popupDate || !selected) return;
-    const next = updateOverride(overrides, monthK, dayKey(popupDate), selected, change);
+    if (!popupDate || !selected) return;
+    const day = dayKey(popupDate);
+    const current = overrideFor(popupDate, selected) ?? {};
+    const key = resolveDay(selected, popupDate)?.fileKey ?? monthKey(popupDate);
+    let next = overrides;
+    for (const k of Object.keys(next)) {
+      if (getOverride(next, k, day, selected)) next = updateOverride(next, k, day, selected, () => ({}));
+    }
+    next = updateOverride(next, key, day, selected, () => change({ ...current }));
     setOverrides(next);
     saveOverrides(next);
   };
 
-  const canEditShift = !!monthK && !!selected;
+  const canEditShift = hasFiles && !!selected;
 
-  // Giorni del mese del file (solo quelli del mese, non i giorni delle settimane vicine) con il turno finale.
+  // Tutti i giorni del mese mostrato, con il turno finale (modifiche e straordinari compresi).
   const monthReport = useMemo(() => {
     const days: MonthRow[] = [];
-    if (month) {
-      for (const week of weeks) {
-        const monday = week.monday;
-        if (!monday) continue;
-        week.days.forEach((data, i) => {
-          const date = addDays(monday, i);
-          if (isSameMonth(date, month)) days.push({ date, data });
-        });
+    if (month && selected) {
+      const count = getDaysInMonth(month);
+      for (let d = 1; d <= count; d++) {
+        const date = new Date(month.getFullYear(), month.getMonth(), d);
+        days.push({ date, data: applyOverride(resolveDay(selected, date)?.data ?? null, overrideFor(date, selected)) });
       }
     }
     return buildMonthReport(days);
-  }, [weeks, month]);
+  }, [month, selected, resolveDay, overrideFor]);
+  // Se mancano dei giorni il totale è parziale.
+  const partialNote = notice?.partial ?? null;
   const monthLabel = month ? format(month, "MMMM yyyy", { locale: it }).replace(/^./, (c) => c.toUpperCase()) : "";
-  const hasMonth = !!month && !!selected && weeks.length > 0;
+  const hasMonth = !!month && !!selected && hasFiles;
   const generatePdf = () => {
     if (!hasMonth) return;
     setSettingsOpen(false);
@@ -769,6 +796,7 @@ function Index() {
       person: selected,
       report: monthReport,
       generatedOn: format(new Date(), "dd/MM/yyyy"),
+      note: partialNote ?? undefined,
     });
     const safeName = selected.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "orari";
     void savePdf(bytes, `Orari-${safeName}-${format(month!, "yyyy-MM")}.pdf`);
@@ -795,10 +823,11 @@ function Index() {
                 ref={fileRef}
                 type="file"
                 accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleFile(f);
+                  const list = Array.from(e.target.files ?? []);
+                  if (list.length > 0) void handleFiles(list);
                   e.target.value = "";
                 }}
               />
@@ -989,6 +1018,7 @@ function Index() {
                                 <span className="text-sm font-semibold">Totale</span>
                                 <span className="text-base font-bold">{monthReport.otHours}</span>
                               </div>
+                              {partialNote && <p className="pt-1.5 text-xs leading-snug text-muted-foreground">{partialNote}</p>}
                             </>
                           ) : (
                             <p className="border-t border-border/60 pt-2 text-sm text-muted-foreground">
@@ -1017,6 +1047,7 @@ function Index() {
             {fileName && (
               <p className="mt-2 truncate text-xs text-muted-foreground">File caricato: {fileName}</p>
             )}
+            {uploadNote && <p className="mt-2 text-xs text-destructive">{uploadNote}</p>}
 
             {suggestedNames.length > 0 && (
               <div className="mt-2 rounded-xl border border-border/60 bg-secondary/60 p-2.5">
@@ -1050,6 +1081,18 @@ function Index() {
               </div>
             )}
           </div>
+          {notice && (
+            <div className="mt-2 flex items-center gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 shadow-sm">
+              <p className="flex-1 text-sm leading-snug text-foreground">{notice.text}</p>
+              <Button
+                className="shrink-0 rounded-xl px-3.5 text-sm text-white hover:opacity-90"
+                style={{ backgroundColor: "var(--app-upload)" }}
+                onClick={() => fileRef.current?.click()}
+              >
+                Carica file
+              </Button>
+            </div>
+          )}
           {weeks.length > 0 && (
             <div
               className="mt-2 grid grid-cols-7 gap-1 px-1 py-2 sm:gap-2"
@@ -1241,7 +1284,7 @@ function Index() {
           ))}
         </section>
 
-        {rows.length === 0 && (
+        {!hasFiles && (
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Carica il file Excel degli orari e seleziona un nome per iniziare.
           </p>
