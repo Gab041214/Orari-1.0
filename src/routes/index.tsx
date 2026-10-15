@@ -455,6 +455,7 @@ function Index() {
   const [adding, setAdding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [overtimeOpen, setOvertimeOpen] = useState(false);
+  const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const [popupDate, setPopupDate] = useState<Date | null>(null);
   // Tessera di cui è aperto il riquadro "Turno originale" (toccando il pallino): "settimana-giorno".
   const [peekKey, setPeekKey] = useState<string | null>(null);
@@ -668,6 +669,27 @@ function Index() {
     });
   }, [selected, month, gridStart, fileList, resolveDay, overrideFor]);
 
+  // Mesi selezionabili dal titolo: quelli con un file in memoria più il mese di oggi, dal più recente.
+  const monthChoices = useMemo(() => {
+    const today = startOfMonth(new Date());
+    const keys = new Set([...Object.keys(files), monthKey(today)]);
+    return [...keys]
+      .sort()
+      .reverse()
+      .map((key) => {
+        const [y, m] = key.split("-").map(Number);
+        const date = new Date(y!, m! - 1, 1);
+        const isToday = key === monthKey(today);
+        const hasFile = !!files[key];
+        return {
+          key,
+          date,
+          label: format(date, "MMMM yyyy", { locale: it }).replace(/^./, (c) => c.toUpperCase()),
+          tag: [isToday ? "oggi" : null, hasFile ? "file" : "senza file"].filter(Boolean).join(" · "),
+        };
+      });
+  }, [files]);
+
   // Avvisi sui file mancanti: manca il file del mese, oppure ci sono i giorni iniziali non coperti da nessun file.
   const notice = useMemo(() => {
     if (!month || !monthK || !selected || !hasFiles) return null;
@@ -810,11 +832,51 @@ function Index() {
         {/* Titolo + toolbar + giorno in testata (sticky, tutto opaco) */}
         <section className="sticky top-0 z-20" style={{ backgroundColor: "var(--app-bg)" }}>
           <header className="mb-4">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              {month
-                ? format(month, "MMMM yyyy", { locale: it }).replace(/^./, (c) => c.toUpperCase())
-                : "Orari 1.0"}
-            </h1>
+            {month ? (
+              <Popover open={monthMenuOpen} onOpenChange={setMonthMenuOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Scegli il mese"
+                    className="inline-flex items-center gap-2 rounded-md text-left text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <h1 className="text-3xl font-bold tracking-tight">
+                      {format(month, "MMMM yyyy", { locale: it }).replace(/^./, (c) => c.toUpperCase())}
+                    </h1>
+                    <ChevronDown
+                      className={cn("size-6 shrink-0 transition-transform duration-200", monthMenuOpen && "rotate-180")}
+                    />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[300px] rounded-2xl p-1.5">
+                  {monthChoices.map((m) => {
+                    const on = m.key === monthK;
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => {
+                          setMonth(m.date);
+                          setMonthMenuOpen(false);
+                          setPeekKey(null);
+                        }}
+                        className={cn(
+                          "flex min-h-11 w-full items-center gap-2 rounded-[10px] px-3 text-left text-[15px] text-foreground",
+                          on ? "font-semibold" : "font-medium",
+                        )}
+                        style={on ? { backgroundColor: "var(--app-chip)" } : undefined}
+                      >
+                        <span className="flex-1">{m.label}</span>
+                        <span className="text-xs font-normal text-muted-foreground">{m.tag}</span>
+                        {on && <Check className="size-4 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">Orari 1.0</h1>
+            )}
           </header>
 
           <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
