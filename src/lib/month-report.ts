@@ -107,8 +107,10 @@ export function buildMonthPdf(args: {
   person: string;
   report: MonthReport;
   generatedOn: string;
+  /** Avviso se il totale è parziale (mancano giorni). */
+  note?: string;
 }): Uint8Array {
-  const { monthLabel, person, report, generatedOn } = args;
+  const { monthLabel, person, report, generatedOn, note } = args;
   const ops: string[] = [];
   const y = (top: number) => PAGE_H - top;
   const text = (s: string, x: number, top: number, size: number, bold = false, gray = 0) => {
@@ -156,6 +158,7 @@ export function buildMonthPdf(args: {
   textRight(report.totalHours, X_OT, top + 20, 11, true);
   text("Straordinari", X_DAY, top + 40, 14, true);
   textRight(report.otHours, X_OT, top + 40, 14, true);
+  if (note) text(note, X_DAY, top + 58, 9, false, 0.4);
   text(`Generato il ${generatedOn}`, 40, PAGE_H - 28, 8, false, 0.5);
 
   const content = ops.join("\n");
