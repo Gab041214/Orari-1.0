@@ -1444,6 +1444,7 @@ function Index() {
                           <article
                             className={cn(
                               "absolute inset-x-0 bottom-0 flex flex-col items-center justify-end rounded-xl bg-[var(--app-tile)] p-1 shadow-sm sm:rounded-2xl sm:p-2",
+                              otBlock && "sm:pb-1.5",
                               today ? "border-2 border-foreground" : "border border-border/60",
                             )}
                             style={{ height: data.shortShift ? "70%" : "100%" }}
@@ -1505,12 +1506,12 @@ function Index() {
                           <div
                             className={cn(
                               "absolute inset-x-0 z-10 flex flex-col items-center px-1 text-center sm:px-2",
-                              otBlock ? "top-[21px] gap-px sm:top-[46px] sm:gap-0.5" : "top-[36px] gap-0.5 sm:top-[55px] sm:gap-1",
+                              otBlock ? "top-[21px] gap-px sm:top-[38px] sm:gap-0.5" : "top-[36px] gap-0.5 sm:top-[55px] sm:gap-1",
                             )}
                           >
                             {/* Straordinario aggiunto prima: sta sopra l'ordinario, con la linea sotto */}
                             {otBlock && data.ot?.side === "before" && (
-                              <div className="mb-px flex w-[70%] flex-col items-center border-b border-border/60 pb-px text-[9px] font-medium leading-[1.1] text-foreground sm:mb-1 sm:pb-1 sm:text-[13px]">
+                              <div className="mb-px flex w-[70%] flex-col items-center border-b border-border/60 pb-px text-[9px] font-medium leading-[1.1] text-foreground sm:mb-0.5 sm:pb-0.5 sm:text-[13px]">
                                 <span>{data.ot.start}</span>
                                 <span>{data.ot.end}</span>
                               </div>
@@ -1533,7 +1534,7 @@ function Index() {
                             </span>
                             {/* Straordinario aggiunto dopo: corpo più piccolo, sotto una linea sottile */}
                             {otBlock && data.ot?.side === "after" && (
-                              <div className="mt-px flex w-[70%] flex-col items-center border-t border-border/60 pt-px text-[9px] font-medium leading-[1.1] text-foreground sm:mt-1 sm:pt-1 sm:text-[13px]">
+                              <div className="mt-px flex w-[70%] flex-col items-center border-t border-border/60 pt-px text-[9px] font-medium leading-[1.1] text-foreground sm:mt-0.5 sm:pt-0.5 sm:text-[13px]">
                                 <span>{data.ot.start}</span>
                                 <span>{data.ot.end}</span>
                               </div>
