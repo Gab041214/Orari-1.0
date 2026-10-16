@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Upload, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
+import { Upload, Download, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
 import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useThemePref, type ThemePref } from "@/lib/theme";
 import { DayEditPanels } from "@/components/shift-editor";
+import { buildBackup, countOverrides, mergeOverrides, parseBackup, saveJson } from "@/lib/backup";
 import { buildMonthPdf, buildMonthReport, savePdf, type MonthRow } from "@/lib/month-report";
 import { fileAnchor, loadFiles, saveFiles, trimFiles, type FileStore } from "@/lib/files";
 import {
@@ -489,6 +490,10 @@ function Index() {
   const [adding, setAdding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [overtimeOpen, setOvertimeOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Esito dell'ultima esportazione/importazione delle modifiche, mostrato sotto i pulsanti.
+  const [backupNote, setBackupNote] = useState<{ title: string; body: string } | null>(null);
+  const backupRef = useRef<HTMLInputElement>(null);
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const [popupDate, setPopupDate] = useState<Date | null>(null);
   // Tessera di cui è aperto il riquadro "Turno originale" (toccando il pallino): "settimana-giorno".
@@ -873,6 +878,53 @@ function Index() {
     const safeName = selected.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "orari";
     void savePdf(bytes, `Orari-${safeName}-${format(month!, "yyyy-MM")}.pdf`);
   };
+  // Esporta le modifiche di tutti i mesi in un file; sui telefoni si apre la condivisione.
+  const exportBackup = () => {
+    const n = countOverrides(overrides);
+    if (n === 0) {
+      setBackupNote({ title: "Nessuna modifica da esportare", body: "Non hai ancora modificato nessun turno." });
+      return;
+    }
+    const filename = `orari-modifiche-${format(new Date(), "yyyy-MM-dd")}.json`;
+    void saveJson(buildBackup(overrides), filename);
+    setBackupNote({
+      title: "Modifiche esportate",
+      body: `${n} ${n === 1 ? "modifica" : "modifiche"} in "${filename}". Salvalo in File o mandalo all'altro dispositivo.`,
+    });
+  };
+  // Importa un file esportato e lo unisce alle modifiche presenti: sullo stesso giorno e nominativo vince il file.
+  const importBackup = async (file: File) => {
+    let incoming: ReturnType<typeof parseBackup> = null;
+    try {
+      incoming = parseBackup(await file.text());
+    } catch {
+      incoming = null;
+    }
+    if (!incoming) {
+      setBackupNote({
+        title: "File non valido",
+        body: "Questo file non contiene modifiche di Orari. Scegli un file \"orari-modifiche-….json\" esportato dall'app.",
+      });
+      return;
+    }
+    if (countOverrides(incoming) === 0) {
+      setBackupNote({ title: "Nessuna modifica da importare", body: "Il file è valido ma è vuoto." });
+      return;
+    }
+    const { store, added, replaced, unchanged } = mergeOverrides(overrides, incoming);
+    setOverrides(store);
+    saveOverrides(store);
+    const total = added + replaced;
+    const parts = [
+      added > 0 ? `${added} ${added === 1 ? "nuova" : "nuove"}` : null,
+      replaced > 0 ? `${replaced} ${replaced === 1 ? "sostituita" : "sostituite"}` : null,
+      unchanged > 0 ? `${unchanged} già ${unchanged === 1 ? "presente" : "presenti"}` : null,
+    ].filter(Boolean);
+    setBackupNote({
+      title: total > 0 ? `Importate ${total} ${total === 1 ? "modifica" : "modifiche"}` : "Nessuna novità",
+      body: `${parts.join(", ")}. Le altre modifiche già presenti sono rimaste.`.replace(/^./, (c) => c.toUpperCase()),
+    });
+  };
   const dateCapitalized = (d: Date, pattern: string) =>
     format(d, pattern, { locale: it }).replace(/^./, (c) => c.toUpperCase());
 
@@ -1047,7 +1099,11 @@ function Index() {
                   open={settingsOpen}
                   onOpenChange={(o) => {
                     setSettingsOpen(o);
-                    if (!o) setOvertimeOpen(false);
+                    if (!o) {
+                      setOvertimeOpen(false);
+                      setAdvancedOpen(false);
+                      setBackupNote(null);
+                    }
                   }}
                 >
                   <PopoverTrigger asChild>
@@ -1060,7 +1116,7 @@ function Index() {
                       <Settings className="size-4" />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-64 rounded-2xl p-3">
+                  <PopoverContent align="end" className="w-72 rounded-2xl p-3">
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">Tema</p>
                     <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1">
                       {THEME_OPTIONS.map(({ value, label, Icon }) => (
@@ -1142,16 +1198,68 @@ function Index() {
                         </div>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      disabled={!hasMonth}
-                      onClick={generatePdf}
-                      className="flex min-h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
-                      style={{ backgroundColor: "var(--app-chip)" }}
-                    >
-                      <FileText className="size-4 shrink-0" />
-                      Genera PDF del mese
-                    </button>
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        disabled={!hasMonth}
+                        onClick={generatePdf}
+                        className="flex min-h-10 w-[calc(50%-4px)] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-2 text-sm font-semibold text-foreground disabled:opacity-40"
+                        style={{ backgroundColor: "var(--app-chip)" }}
+                      >
+                        <FileText className="size-4 shrink-0" />
+                        Genera PDF
+                      </button>
+                      <button
+                        type="button"
+                        aria-expanded={advancedOpen}
+                        onClick={() => setAdvancedOpen((o) => !o)}
+                        className="flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 text-[13px] font-semibold text-foreground"
+                      >
+                        Opzioni avanzate
+                        <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", advancedOpen && "rotate-180")} />
+                      </button>
+                    </div>
+                    {advancedOpen && (
+                      <div className="animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none">
+                        <div className="-mx-3 my-2.5 h-px bg-border" />
+                        <p className="mb-1.5 text-xs font-medium text-muted-foreground">Modifiche e straordinari</p>
+                        <input
+                          ref={backupRef}
+                          type="file"
+                          accept=".json,application/json"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) void importBackup(f);
+                            e.target.value = "";
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={exportBackup}
+                          className="flex min-h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground"
+                          style={{ backgroundColor: "var(--app-chip)" }}
+                        >
+                          <Upload className="size-4 shrink-0" />
+                          Esporta modifiche
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => backupRef.current?.click()}
+                          className="mt-1.5 flex min-h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground"
+                          style={{ backgroundColor: "var(--app-chip)" }}
+                        >
+                          <Download className="size-4 shrink-0" />
+                          Importa modifiche
+                        </button>
+                        {backupNote && (
+                          <div className="animate-in fade-in-0 slide-in-from-top-1 mt-2 rounded-[10px] border border-border px-2.5 py-2 text-xs leading-snug duration-200 motion-reduce:animate-none">
+                            <p className="mb-0.5 font-semibold text-foreground">{backupNote.title}</p>
+                            <p className="text-muted-foreground">{backupNote.body}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </PopoverContent>
                 </Popover>
               </div>
