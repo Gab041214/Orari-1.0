@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Upload, Download, Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
+import { Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
 import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -53,6 +53,27 @@ export const Route = createFileRoute("/")({
   }),
   component: Index,
 });
+
+/** Quadrato aperto in alto con freccia: in su = esporta (come la condivisione di iOS), in giù = porta dentro. */
+function BoxArrowIcon({ direction, className, size = 16, strokeWidth = 1.8 }: { direction: "up" | "down"; className?: string; size?: number; strokeWidth?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M8 9H6.5A2.5 2.5 0 0 0 4 11.5V18.5A2.5 2.5 0 0 0 6.5 21H17.5A2.5 2.5 0 0 0 20 18.5V11.5A2.5 2.5 0 0 0 17.5 9H16" />
+      <path d={direction === "up" ? "M12 15V3M8 7L12 3L16 7" : "M12 3V15M8 11L12 15L16 11"} />
+    </svg>
+  );
+}
 
 const STORAGE_KEY = "turni.voci";
 // Sessione persistente: nominativo scelto, ripristinato alla riapertura (i file stanno in "orari.files")
@@ -1091,20 +1112,7 @@ function Index() {
                 aria-label="Carica file Excel"
                 title="Carica file Excel"
               >
-                <svg
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0"
-                  aria-hidden="true"
-                >
-                  <path d="M12 15V4M8 8L12 4L16 8M4 15V18A2 2 0 0 0 6 20H18A2 2 0 0 0 20 18V15" />
-                </svg>
+                <BoxArrowIcon direction="down" size={26} className="shrink-0 text-white" />
                 <svg
                   width="26"
                   height="26"
@@ -1266,7 +1274,7 @@ function Index() {
                           className="flex min-h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground"
                           style={{ backgroundColor: "var(--app-chip)" }}
                         >
-                          <Upload className="size-4 shrink-0" />
+                          <BoxArrowIcon direction="up" className="shrink-0" />
                           Esporta modifiche
                         </button>
                         <button
@@ -1275,7 +1283,7 @@ function Index() {
                           className="mt-1.5 flex min-h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground"
                           style={{ backgroundColor: "var(--app-chip)" }}
                         >
-                          <Download className="size-4 shrink-0" />
+                          <BoxArrowIcon direction="down" className="shrink-0" />
                           Importa modifiche
                         </button>
                         {backupNote && (
