@@ -626,7 +626,6 @@ function Index() {
     return keys.length > 0 ? files[keys[keys.length - 1]!] : undefined;
   }, [files, monthK]);
   const rows = useMemo(() => currentFile?.rows ?? [], [currentFile]);
-  const fileName = currentFile?.name ?? null;
 
   // Nomi da mostrare nel menu: quelli in elenco che compaiono nel file del mese mostrato (anche senza
   // turni), più quello selezionato. Senza file si vede l'elenco completo.
@@ -982,7 +981,7 @@ function Index() {
           </header>
 
           <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-            <div className="grid grid-cols-[auto_1fr] gap-2">
+            <div className="flex gap-2">
               <input
                 ref={fileRef}
                 type="file"
@@ -995,16 +994,6 @@ function Index() {
                   e.target.value = "";
                 }}
               />
-              <Button
-                className="w-full gap-1.5 whitespace-nowrap rounded-xl px-3 text-sm text-white hover:opacity-90"
-                style={{ backgroundColor: "var(--app-upload)" }}
-                onClick={() => fileRef.current?.click()}
-                title="Carica file Excel"
-              >
-                <Upload className="size-4 shrink-0" />
-                <span>Carica file Excel</span>
-              </Button>
-              <div className="flex gap-2">
                 <Popover
                   open={namesOpen}
                   onOpenChange={(o) => {
@@ -1095,6 +1084,43 @@ function Index() {
                     </ul>
                   </PopoverContent>
                 </Popover>
+              <Button
+                className="h-9 shrink-0 gap-[3px] rounded-xl border-0 px-[18px] text-white hover:opacity-90 focus-visible:ring-2 focus-visible:ring-foreground [&_svg]:size-[26px]"
+                style={{ backgroundColor: "var(--app-upload)" }}
+                onClick={() => fileRef.current?.click()}
+                aria-label="Carica file Excel"
+                title="Carica file Excel"
+              >
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                  aria-hidden="true"
+                >
+                  <path d="M12 15V4M8 8L12 4L16 8M4 15V18A2 2 0 0 0 6 20H18A2 2 0 0 0 20 18V15" />
+                </svg>
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2.5" />
+                  <path d="M3 9H21M3 15H21M9 3V21" />
+                </svg>
+              </Button>
                 <Popover
                   open={settingsOpen}
                   onOpenChange={(o) => {
@@ -1262,13 +1288,9 @@ function Index() {
                     )}
                   </PopoverContent>
                 </Popover>
-              </div>
             </div>
 
 
-            {fileName && (
-              <p className="mt-2 truncate text-xs text-muted-foreground">File caricato: {fileName}</p>
-            )}
             {uploadNote && <p className="mt-2 text-xs text-destructive">{uploadNote}</p>}
 
             {suggestedNames.length > 0 && (
