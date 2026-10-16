@@ -1106,13 +1106,12 @@ function Index() {
                   </PopoverContent>
                 </Popover>
               <Button
-                className="h-9 shrink-0 gap-[3px] rounded-xl border-0 px-[18px] text-white hover:opacity-90 focus-visible:ring-2 focus-visible:ring-foreground [&_svg]:size-[26px]"
+                className="h-9 w-11 shrink-0 rounded-xl border-0 px-0 text-white hover:opacity-90 focus-visible:ring-2 focus-visible:ring-foreground [&_svg]:size-[26px]"
                 style={{ backgroundColor: "var(--app-upload)" }}
                 onClick={() => fileRef.current?.click()}
                 aria-label="Carica file Excel"
                 title="Carica file Excel"
               >
-                <BoxArrowIcon direction="down" size={26} className="shrink-0 text-white" />
                 <svg
                   width="26"
                   height="26"
@@ -1125,8 +1124,11 @@ function Index() {
                   className="shrink-0"
                   aria-hidden="true"
                 >
-                  <rect x="3" y="3" width="18" height="18" rx="2.5" />
-                  <path d="M3 9H21M3 15H21M9 3V21" />
+                  <rect x="2.5" y="3" width="15.5" height="15.5" rx="2.5" />
+                  <path d="M2.5 8.5H18M2.5 13.5H10.5M7.5 3V18.5" />
+                  {/* Cerchio dello stesso colore del pulsante: stacca la freccia dal foglio */}
+                  <circle cx="17.5" cy="17.5" r="5.4" stroke="none" style={{ fill: "var(--app-upload)" }} />
+                  <path d="M17.5 20.4V14.6M15 17L17.5 14.5L20 17" />
                 </svg>
               </Button>
                 <Popover
