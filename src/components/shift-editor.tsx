@@ -276,7 +276,7 @@ export function DayEditPanels({
       ? `Straordinario ${preview.ot.start} – ${preview.ot.end}. Totale con ordinario: ${preview.total ?? ""}`
       : "";
 
-  const segClass = "min-h-11 min-w-0 flex-1 whitespace-nowrap rounded-xl px-1 text-sm";
+  const segClass = "min-h-11 min-w-0 flex-1 whitespace-nowrap rounded-xl px-0.5 text-center text-[13px] tracking-tight";
   const dim = wholeShift ? "opacity-40" : "";
   const segStyle = (on: boolean) =>
     on ? { backgroundColor: accent, color: accentText } : undefined;
@@ -317,7 +317,7 @@ export function DayEditPanels({
           <div className="text-sm text-muted-foreground">{ordinaryHours}</div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <button
             type="button"
             aria-pressed={otDraft.side === "before"}
