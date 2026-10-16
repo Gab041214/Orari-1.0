@@ -245,17 +245,51 @@ function looksLikeRealName(raw: string): boolean {
   return true;
 }
 
-/** Ricostruisce la mappa offset -> turno (Sunday=0, Mon..Sat=1..6, poi +7 per ogni riga) per un nominativo. */
+/** Riga di intestazione di una settimana ("Settimana 1", ... anche senza numero). */
+function isWeekHeader(row: string[]): boolean {
+  return norm(row[1] ?? "").startsWith("settimana");
+}
+
+/** Numero di settimane (blocchi) di un file: quante intestazioni "Settimana" contiene. */
+function weeksInFile(rows: string[][]): number {
+  const n = rows.filter(isWeekHeader).length;
+  return n > 0 ? n : 5;
+}
+
+/**
+ * Ricostruisce la mappa offset -> turno (Sunday=0, Mon..Sat=1..6, poi +7 per ogni settimana) per un nominativo.
+ * La settimana di una riga è quella dell'intestazione "Settimana" che la precede: così un collega che
+ * compare solo in alcune settimane (o entra a metà mese) resta sui giorni giusti. Se il file non ha
+ * intestazioni si contano le righe in cui compare il nome.
+ */
 function offsetMapForName(rows: string[][], name: string): Map<number, DayData> {
-  const matching = rows.filter((r) => nameMatches(r[1] ?? "", name));
   const byOffset = new Map<number, DayData>();
-  matching.forEach((row, i) => {
-    const base = i * 7;
+  const put = (row: string[], base: number) => {
     byOffset.set(base, blockData(row, DAY_BLOCKS[6]!));
     for (let d = 0; d < 6; d++) {
       byOffset.set(base + 1 + d, blockData(row, DAY_BLOCKS[d]!));
     }
-  });
+  };
+
+  if (!rows.some(isWeekHeader)) {
+    rows.filter((r) => nameMatches(r[1] ?? "", name)).forEach((row, i) => put(row, i * 7));
+    return byOffset;
+  }
+
+  // Per ogni settimana si tiene una sola riga: preferita quella con il nome identico.
+  const best = new Map<number, { row: string[]; exact: boolean }>();
+  let week = -1;
+  for (const r of rows) {
+    if (isWeekHeader(r)) {
+      week++;
+      continue;
+    }
+    if (week < 0 || !nameMatches(r[1] ?? "", name)) continue;
+    const exact = norm(r[1] ?? "") === norm(name);
+    const cur = best.get(week);
+    if (!cur || (exact && !cur.exact)) best.set(week, { row: r, exact });
+  }
+  for (const [w, { row }] of best) put(row, w * 7);
   return byOffset;
 }
 
@@ -589,9 +623,21 @@ function Index() {
   const rows = useMemo(() => currentFile?.rows ?? [], [currentFile]);
   const fileName = currentFile?.name ?? null;
 
+  // Nomi da mostrare nel menu: quelli in elenco che compaiono nel file del mese mostrato (anche senza
+  // turni), più quello selezionato. Senza file si vede l'elenco completo.
+  const menuOptions = useMemo(() => {
+    if (!currentFile) return sortedOptions;
+    return sortedOptions.filter(
+      (o) =>
+        o === selected ||
+        currentFile.rows.some((r) => looksLikeRealName(r[1] ?? "") && nameMatches(r[1] ?? "", o)),
+    );
+  }, [currentFile, sortedOptions, selected]);
+
   // File ordinati con la loro domenica di partenza.
   const fileList = useMemo(
-    () => Object.entries(files).map(([key, f]) => ({ key, rows: f.rows, anchor: fileAnchor(f) })),
+    () =>
+      Object.entries(files).map(([key, f]) => ({ key, rows: f.rows, anchor: fileAnchor(f), weeks: weeksInFile(f.rows) })),
     [files],
   );
   // Per ogni file e nominativo: giorno (offset dalla domenica di partenza) -> turno.
@@ -700,11 +746,15 @@ function Index() {
         partial: `Totale parziale: manca il file di ${monthName}.`,
       };
     }
-    // Giorni iniziali del mese non coperti da nessun file (se il nominativo è nel file del mese).
+    // Giorni iniziali del mese non coperti da nessun file (indipendentemente dal nominativo).
     let missing = 0;
     const days = getDaysInMonth(month);
     for (let d = 1; d <= days; d++) {
-      if (resolveDay(selected, new Date(month.getFullYear(), month.getMonth(), d))) break;
+      const date = new Date(month.getFullYear(), month.getMonth(), d);
+      if (fileList.some((f) => {
+        const off = differenceInCalendarDays(date, f.anchor);
+        return off >= 0 && off < f.weeks * 7;
+      })) break;
       missing++;
     }
     if (missing === 0 || missing === days) return null;
@@ -714,7 +764,7 @@ function Index() {
       text: `Mancano ${range} ${monthName}: ${missing === 1 ? "è" : "sono"} nel file di ${prev}.`,
       partial: `Totale parziale: mancano ${range}.`,
     };
-  }, [month, monthK, selected, hasFiles, files, resolveDay]);
+  }, [month, monthK, selected, hasFiles, files, fileList]);
 
   // Nominativi trovati nella colonna B del file ma non ancora presenti nell'elenco voci
   // (né coperti, anche parzialmente, da uno già presente) e non ignorati dall'utente.
@@ -965,10 +1015,12 @@ function Index() {
 
                     {/* Lista scrollabile: la riga sopra resta fissa anche con la tastiera aperta */}
                     <ul className="max-h-64 space-y-1 overflow-y-auto overscroll-contain">
-                      {sortedOptions.length === 0 && (
-                        <li className="py-4 text-center text-sm text-muted-foreground">Nessun nome.</li>
+                      {menuOptions.length === 0 && (
+                        <li className="py-4 text-center text-sm text-muted-foreground">
+                          {options.length > 0 ? "Nessun nome in questo mese." : "Nessun nome."}
+                        </li>
                       )}
-                      {sortedOptions.map((o) => (
+                      {menuOptions.map((o) => (
                         <EntryRow
                           key={o}
                           name={o}
