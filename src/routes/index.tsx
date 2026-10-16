@@ -1318,6 +1318,13 @@ function Index() {
                               otBlock ? "top-[21px] gap-px sm:top-[46px] sm:gap-0.5" : "top-[36px] gap-0.5 sm:top-[55px] sm:gap-1",
                             )}
                           >
+                            {/* Straordinario aggiunto prima: sta sopra l'ordinario, con la linea sotto */}
+                            {otBlock && data.ot?.side === "before" && (
+                              <div className="mb-px flex w-[70%] flex-col items-center border-b border-border/60 pb-px text-[9px] font-medium leading-[1.1] text-foreground sm:mb-1 sm:pb-1 sm:text-[13px]">
+                                <span>{data.ot.start}</span>
+                                <span>{data.ot.end}</span>
+                              </div>
+                            )}
                             <span
                               className={cn(
                                 "text-[12px] font-bold text-foreground sm:text-base",
@@ -1334,8 +1341,8 @@ function Index() {
                             >
                               {data.end}
                             </span>
-                            {/* Straordinario: corpo più piccolo, sotto una linea sottile */}
-                            {otBlock && data.ot && (
+                            {/* Straordinario aggiunto dopo: corpo più piccolo, sotto una linea sottile */}
+                            {otBlock && data.ot?.side === "after" && (
                               <div className="mt-px flex w-[70%] flex-col items-center border-t border-border/60 pt-px text-[9px] font-medium leading-[1.1] text-foreground sm:mt-1 sm:pt-1 sm:text-[13px]">
                                 <span>{data.ot.start}</span>
                                 <span>{data.ot.end}</span>
