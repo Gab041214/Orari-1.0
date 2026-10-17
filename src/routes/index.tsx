@@ -395,7 +395,7 @@ function EntryRow({
   };
 
   return (
-    <li className="relative h-11 shrink-0 overflow-hidden rounded-xl">
+    <li className="relative h-11 shrink-0 overflow-hidden rounded-[14px]">
       <div
         className="absolute inset-y-0 right-0 flex items-center justify-end gap-1 pl-1"
         style={{ width: SWIPE_ACTIONS_WIDTH }}
@@ -423,8 +423,8 @@ function EntryRow({
       </div>
       <div
         className={cn(
-          "relative flex h-11 touch-pan-y cursor-pointer items-center overflow-hidden rounded-xl bg-secondary px-3",
-          selected && "ring-2 ring-inset ring-foreground/70",
+          "relative flex h-11 touch-pan-y cursor-pointer items-center overflow-hidden rounded-[14px] px-3",
+          selected && "bg-[var(--glass-chip)]",
         )}
         style={{
           width: `calc(100% - ${reveal}px)`,
@@ -1075,7 +1075,7 @@ function Index() {
                     />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[300px] rounded-2xl p-1.5">
+                <PopoverContent align="start" className="w-[300px] p-2.5">
                   {monthChoices.map((m) => {
                     const on = m.key === monthK;
                     return (
@@ -1088,10 +1088,10 @@ function Index() {
                           setPeekKey(null);
                         }}
                         className={cn(
-                          "flex min-h-11 w-full items-center gap-2 rounded-[10px] px-3 text-left text-[15px] text-foreground",
+                          "flex min-h-11 w-full items-center gap-2 rounded-[14px] px-3 text-left text-[15px] text-foreground",
                           on ? "font-semibold" : "font-medium",
                         )}
-                        style={on ? { backgroundColor: "var(--app-chip)" } : undefined}
+                        style={on ? { backgroundColor: "var(--glass-chip)" } : undefined}
                       >
                         <span className="flex-1">{m.label}</span>
                         <span className="text-xs font-normal text-muted-foreground">{m.tag}</span>
@@ -1143,7 +1143,7 @@ function Index() {
                       <ChevronDown className="size-[22px] shrink-0 text-muted-foreground" />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent align="start" className="w-72 rounded-2xl p-2">
+                  <PopoverContent align="start" className="w-72 p-3.5">
                     {/* Riga fissa: pulsante "+" e casella di inserimento (Opzione A: non scorre con la lista) */}
                     <div className="mb-2 flex shrink-0 items-center gap-2">
                       {adding ? (
@@ -1261,7 +1261,7 @@ function Index() {
                       <Settings className="size-[26px]" />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-72 rounded-2xl p-3">
+                  <PopoverContent align="end" className="w-[300px] max-w-[calc(100vw-1.5rem)] p-3.5">
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">Tema</p>
                     <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1">
                       {THEME_OPTIONS.map(({ value, label, Icon }) => (
@@ -1298,15 +1298,15 @@ function Index() {
                         />
                       ))}
                     </div>
-                    <div className="-mx-3 my-3 h-px bg-border" />
+                    <div className="-mx-3.5 my-3 h-px bg-[var(--glass-sep)]" />
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">Mese</p>
-                    <div className="mb-1.5 rounded-[10px]" style={{ backgroundColor: "var(--app-chip)" }}>
+                    <div className="mb-1.5 rounded-[14px]" style={{ backgroundColor: "var(--glass-chip)" }}>
                       <button
                         type="button"
                         disabled={!hasMonth}
                         aria-expanded={overtimeOpen}
                         onClick={() => setOvertimeOpen((o) => !o)}
-                        className="flex min-h-10 w-full items-center justify-between px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
+                        className="flex min-h-11 w-full items-center justify-between px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
                       >
                         Straordinari del mese
                         <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", overtimeOpen && "rotate-180")} />
@@ -1348,8 +1348,8 @@ function Index() {
                         type="button"
                         disabled={!hasMonth}
                         onClick={generatePdf}
-                        className="flex min-h-10 w-[calc(50%-4px)] items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-2 text-sm font-semibold text-foreground disabled:opacity-40"
-                        style={{ backgroundColor: "var(--app-chip)" }}
+                        className="flex min-h-11 w-[calc(50%-4px)] items-center justify-center gap-2 whitespace-nowrap rounded-[14px] px-2 text-sm font-semibold text-foreground disabled:opacity-40"
+                        style={{ backgroundColor: "var(--glass-chip)" }}
                       >
                         <FileText className="size-4 shrink-0" />
                         Genera PDF
@@ -1358,7 +1358,7 @@ function Index() {
                         type="button"
                         aria-expanded={advancedOpen}
                         onClick={() => setAdvancedOpen((o) => !o)}
-                        className="flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 text-[13px] font-semibold text-foreground"
+                        className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 text-[13px] font-semibold text-foreground"
                       >
                         Opzioni avanzate
                         <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", advancedOpen && "rotate-180")} />
@@ -1366,7 +1366,7 @@ function Index() {
                     </div>
                     {advancedOpen && (
                       <div className="animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none">
-                        <div className="-mx-3 my-2.5 h-px bg-border" />
+                        <div className="-mx-3.5 my-2.5 h-px bg-[var(--glass-sep)]" />
                         <p className="mb-1.5 text-xs font-medium text-muted-foreground">Modifiche e straordinari</p>
                         <input
                           ref={backupRef}
@@ -1382,8 +1382,8 @@ function Index() {
                         <button
                           type="button"
                           onClick={exportBackup}
-                          className="flex min-h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground"
-                          style={{ backgroundColor: "var(--app-chip)" }}
+                          className="flex min-h-11 w-full items-center gap-2 rounded-[14px] px-2.5 text-left text-sm font-semibold text-foreground"
+                          style={{ backgroundColor: "var(--glass-chip)" }}
                         >
                           <BoxArrowIcon direction="up" className="shrink-0" />
                           Esporta modifiche
@@ -1391,19 +1391,19 @@ function Index() {
                         <button
                           type="button"
                           onClick={() => backupRef.current?.click()}
-                          className="mt-1.5 flex min-h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm font-semibold text-foreground"
-                          style={{ backgroundColor: "var(--app-chip)" }}
+                          className="mt-1.5 flex min-h-11 w-full items-center gap-2 rounded-[14px] px-2.5 text-left text-sm font-semibold text-foreground"
+                          style={{ backgroundColor: "var(--glass-chip)" }}
                         >
                           <BoxArrowIcon direction="down" className="shrink-0" />
                           Importa modifiche
                         </button>
                         {backupNote && (
-                          <div className="animate-in fade-in-0 slide-in-from-top-1 mt-2 rounded-[10px] border border-border px-2.5 py-2 text-xs leading-snug duration-200 motion-reduce:animate-none">
+                          <div className="animate-in fade-in-0 slide-in-from-top-1 mt-2 rounded-[14px] border border-border px-2.5 py-2 text-xs leading-snug duration-200 motion-reduce:animate-none">
                             <p className="mb-0.5 font-semibold text-foreground">{backupNote.title}</p>
                             <p className="text-muted-foreground">{backupNote.body}</p>
                           </div>
                         )}
-                        <div className="-mx-3 my-2.5 h-px bg-border" />
+                        <div className="-mx-3.5 my-2.5 h-px bg-[var(--glass-sep)]" />
                         <p className="mb-1.5 text-xs font-medium text-muted-foreground">Nomi collegati</p>
                         {aliases.length === 0 && (
                           <p className="mb-1.5 text-xs text-muted-foreground">Nessun nome collegato.</p>
@@ -1411,8 +1411,8 @@ function Index() {
                         {aliases.map((a) => (
                           <div
                             key={a.from}
-                            className="mb-1.5 flex min-h-10 items-center gap-2 rounded-[10px] px-2.5 text-sm text-foreground"
-                            style={{ backgroundColor: "var(--app-chip)" }}
+                            className="mb-1.5 flex min-h-11 items-center gap-2 rounded-[14px] px-2.5 text-sm text-foreground"
+                            style={{ backgroundColor: "var(--glass-chip)" }}
                           >
                             <span className="min-w-0 truncate">{a.from}</span>
                             <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
@@ -1440,14 +1440,14 @@ function Index() {
                           type="button"
                           aria-expanded={linkFormOpen}
                           onClick={() => setLinkFormOpen((o) => !o)}
-                          className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[10px] px-2.5 text-sm font-semibold text-foreground"
-                          style={{ backgroundColor: "var(--app-chip)" }}
+                          className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[14px] px-2.5 text-sm font-semibold text-foreground"
+                          style={{ backgroundColor: "var(--glass-chip)" }}
                         >
                           <Plus className="size-4 shrink-0" />
                           Collega due nomi
                         </button>
                         {linkFormOpen && (
-                          <div className="animate-in fade-in-0 slide-in-from-top-1 mt-2 rounded-[10px] border border-border p-2.5 duration-200 motion-reduce:animate-none">
+                          <div className="animate-in fade-in-0 slide-in-from-top-1 mt-2 rounded-[14px] border border-border p-2.5 duration-200 motion-reduce:animate-none">
                             <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="link-from">
                               Nome scritto male (come nel file)
                             </label>
@@ -1702,9 +1702,10 @@ function Index() {
                               data-peek
                               role="status"
                               className={cn(
-                                "absolute top-[36px] z-40 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none rounded-[10px] border border-border/60 bg-card px-[9px] py-1.5 text-foreground shadow-lg sm:top-[46px]",
+                                "ios-in glass absolute top-[36px] z-40 rounded-[14px] px-2.5 py-2 text-foreground sm:top-[46px]",
                                 i < 3 ? "left-0" : "right-0",
                               )}
+                              style={{ transformOrigin: i < 3 ? "14px 0" : "calc(100% - 14px) 0" }}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div className="text-[10px] leading-tight text-muted-foreground">Turno originale</div>
@@ -1765,9 +1766,10 @@ function Index() {
                                   data-peek
                                   role="status"
                                   className={cn(
-                                    "absolute bottom-[34px] z-40 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none rounded-[10px] border border-border/60 bg-card px-[9px] py-1.5 text-foreground shadow-lg sm:bottom-[48px]",
+                                    "ios-in glass absolute bottom-[34px] z-40 rounded-[14px] px-2.5 py-2 text-foreground sm:bottom-[48px]",
                                     i < 3 ? "left-0" : "right-0",
                                   )}
+                                  style={{ transformOrigin: i < 3 ? "14px 100%" : "calc(100% - 14px) 100%" }}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="text-[10px] leading-tight text-muted-foreground">Straordinario</div>
@@ -1843,7 +1845,7 @@ function Index() {
           showCloseButton={false}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <div className="rounded-2xl border border-border/60 bg-background p-5 shadow-lg">
+          <div className="ios-card glass rounded-[28px] p-5">
             <DialogTitle className="mb-3 whitespace-nowrap text-lg font-semibold leading-tight tracking-normal">
               {dayPopup ? dateCapitalized(dayPopup.date, "EEEE d MMMM") : ""}
             </DialogTitle>
