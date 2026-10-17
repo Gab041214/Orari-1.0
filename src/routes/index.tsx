@@ -4,7 +4,7 @@ import { Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, 
 import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
-import { aliasLookup, loadAliases, nameDistance, rankSimilar, saveAliases, withAlias, type Alias } from "@/lib/aliases";
+import { aliasLookup, loadAliases, saveAliases, similarNames, withAlias, type Alias } from "@/lib/aliases";
 import { Button } from "@/components/ui/button";
 
 
@@ -826,17 +826,18 @@ function Index() {
   // Nome nuovo di cui si chiede se è lo stesso di uno in elenco (sparisce se non è più proposto).
   const linkingName = linking && suggestedNames.includes(linking) ? linking : null;
   const similarOptions = useMemo(
-    () => (linkingName ? rankSimilar(linkingName, options).slice(0, 8) : []),
+    () => (linkingName ? similarNames(linkingName, options).slice(0, 8) : []),
     [linkingName, options],
   );
   const openLink = (name: string) => {
-    if (options.length === 0) {
+    // La domanda compare solo se in elenco c'è un nome simile; altrimenti il nome si aggiunge subito.
+    const best = similarNames(name, options)[0];
+    if (!best) {
       persist([...options, name]);
       return;
     }
-    const best = rankSimilar(name, options)[0];
     setLinking(name);
-    setLinkTarget(best && nameDistance(name, best) <= 0.5 ? best : null);
+    setLinkTarget(best);
   };
   // Nomi scritti nei file che non sono in elenco né già collegati: suggerimenti per "Collega due nomi".
   const fileNameChoices = useMemo(() => {
