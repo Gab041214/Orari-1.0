@@ -1028,14 +1028,14 @@ function Index() {
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="flex h-9 w-full min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-card px-2 text-sm"
+                      className="flex h-9 w-full min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-card px-2 text-[19px]"
                       aria-label="Filtra per voce"
                     >
-                      <Users className="size-4 shrink-0 text-muted-foreground" />
+                      <Users className="size-[26px] shrink-0 text-muted-foreground" />
                       <span className={cn("flex-1 truncate text-left", !selected && "text-muted-foreground")}>
                         {selected || "Nome"}
                       </span>
-                      <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                      <ChevronDown className="size-[22px] shrink-0 text-muted-foreground" />
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-72 rounded-2xl p-2">
@@ -1149,7 +1149,7 @@ function Index() {
                       title="Impostazioni"
                       className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm"
                     >
-                      <Settings className="size-4" />
+                      <Settings className="size-[26px]" />
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-72 rounded-2xl p-3">
