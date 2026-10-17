@@ -1513,30 +1513,34 @@ function Index() {
                           >
                             {/* Straordinario aggiunto prima: sta sopra l'ordinario, con la linea sotto */}
                             {otBlock && data.ot?.side === "before" && (
-                              <div className="mb-px flex w-[70%] flex-col items-center border-b border-border/60 pb-px text-[9px] font-medium leading-[1.1] text-foreground sm:mb-0.5 sm:pb-0.5 sm:text-[13px]">
+                              <div className="mb-px flex w-[70%] flex-col items-center border-b pb-px text-[9px] font-medium leading-[1.1] sm:mb-0.5 sm:pb-0.5 sm:text-[13px]" style={{ color: accent, borderColor: accent }}>
                                 <span>{data.ot.start}</span>
                                 <span>{data.ot.end}</span>
                               </div>
                             )}
                             <span
                               className={cn(
-                                "text-[12px] font-bold text-foreground sm:text-base",
+                                "text-[12px] font-bold sm:text-base",
                                 otBlock ? "leading-[1.1]" : "leading-tight",
+                                data.ot?.side !== "all" && "text-foreground",
                               )}
+                              style={data.ot?.side === "all" ? { color: accent } : undefined}
                             >
                               {data.start}
                             </span>
                             <span
                               className={cn(
-                                "text-[12px] font-bold text-foreground sm:text-base",
+                                "text-[12px] font-bold sm:text-base",
                                 otBlock ? "leading-[1.1]" : "leading-tight",
+                                data.ot?.side !== "all" && "text-foreground",
                               )}
+                              style={data.ot?.side === "all" ? { color: accent } : undefined}
                             >
                               {data.end}
                             </span>
                             {/* Straordinario aggiunto dopo: corpo più piccolo, sotto una linea sottile */}
                             {otBlock && data.ot?.side === "after" && (
-                              <div className="mt-px flex w-[70%] flex-col items-center border-t border-border/60 pt-px text-[9px] font-medium leading-[1.1] text-foreground sm:mt-0.5 sm:pt-0.5 sm:text-[13px]">
+                              <div className="mt-px flex w-[70%] flex-col items-center border-t pt-px text-[9px] font-medium leading-[1.1] sm:mt-0.5 sm:pt-0.5 sm:text-[13px]" style={{ color: accent, borderColor: accent }}>
                                 <span>{data.ot.start}</span>
                                 <span>{data.ot.end}</span>
                               </div>
