@@ -338,7 +338,7 @@ function blockData(row: string[], cols: number[]): DayData {
   return shiftFromTimes(values[0] ?? "", values[values.length - 1] ?? "");
 }
 
-const SWIPE_ACTIONS_WIDTH = 80; // 2 pulsanti da 36px + gap 8px, allineati al bordo destro
+const SWIPE_ACTION_WIDTH = 44; // un pulsante da 36px + 8px di margine: a sinistra "modifica", a destra "elimina"
 
 /** Riga voce con swipe da destra verso sinistra: rivela modifica (blu) ed elimina (rosso). Tocco semplice = seleziona. */
 function EntryRow({
@@ -374,7 +374,7 @@ function EntryRow({
     if (!dragging) return;
     const delta = startX.current - e.clientX;
     if (Math.abs(delta) > 4) moved.current = true;
-    setReveal(Math.min(SWIPE_ACTIONS_WIDTH, Math.max(0, startReveal.current + delta)));
+    setReveal(Math.min(SWIPE_ACTION_WIDTH, Math.max(-SWIPE_ACTION_WIDTH, startReveal.current + delta)));
   };
   const onPointerUp = () => {
     if (!dragging) return;
@@ -385,7 +385,9 @@ function EntryRow({
       else setReveal(0);
       return;
     }
-    setReveal((current) => (current > SWIPE_ACTIONS_WIDTH / 2 ? SWIPE_ACTIONS_WIDTH : 0));
+    setReveal((current) =>
+      Math.abs(current) > SWIPE_ACTION_WIDTH / 2 ? Math.sign(current) * SWIPE_ACTION_WIDTH : 0,
+    );
   };
 
   const confirmRename = () => {
@@ -396,9 +398,17 @@ function EntryRow({
 
   return (
     <li className="relative h-11 shrink-0 overflow-hidden rounded-[14px]">
+      {/* Scorrendo la riga verso destra compare "modifica" a sinistra; verso sinistra "elimina" a destra.
+          Le righe sono trasparenti: i pulsanti si mostrano solo quando la riga è scorsa. */}
       <div
-        className="absolute inset-y-0 right-0 flex items-center justify-end gap-1 pl-1"
-        style={{ width: SWIPE_ACTIONS_WIDTH }}
+        className="absolute inset-y-0 left-0 flex items-center justify-start"
+        style={{
+          width: SWIPE_ACTION_WIDTH,
+          opacity: reveal < 0 ? 1 : 0,
+          pointerEvents: reveal < 0 ? "auto" : "none",
+          transition: "opacity 0.12s ease",
+        }}
+        aria-hidden={reveal >= 0}
       >
         <button
           type="button"
@@ -412,6 +422,17 @@ function EntryRow({
         >
           <Keyboard className="size-[18px]" />
         </button>
+      </div>
+      <div
+        className="absolute inset-y-0 right-0 flex items-center justify-end"
+        style={{
+          width: SWIPE_ACTION_WIDTH,
+          opacity: reveal > 0 ? 1 : 0,
+          pointerEvents: reveal > 0 ? "auto" : "none",
+          transition: "opacity 0.12s ease",
+        }}
+        aria-hidden={reveal <= 0}
+      >
         <button
           type="button"
           aria-label={`Elimina ${name}`}
@@ -427,8 +448,9 @@ function EntryRow({
           selected && "bg-[var(--glass-chip)]",
         )}
         style={{
-          width: `calc(100% - ${reveal}px)`,
-          transition: dragging ? "none" : "width 0.2s ease",
+          width: `calc(100% - ${Math.abs(reveal)}px)`,
+          marginLeft: reveal < 0 ? -reveal : 0,
+          transition: dragging ? "none" : "width 0.2s ease, margin-left 0.2s ease",
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
