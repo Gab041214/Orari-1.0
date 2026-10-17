@@ -41,9 +41,9 @@ function otDraftFrom(ot: Overtime | undefined, ordinary: DayData): OtDraft {
 }
 
 const cardClass =
-  "rounded-2xl border border-border/60 bg-background p-5 shadow-lg animate-in fade-in-0 slide-in-from-top-2 duration-200 motion-reduce:animate-none";
+  "ios-card glass rounded-[28px] p-5";
 const collapsedClass =
-  "relative flex min-h-[60px] min-w-0 flex-1 items-center justify-between gap-1 rounded-2xl border border-border/60 bg-background pl-4 pr-3.5 text-left text-foreground shadow-lg disabled:opacity-40";
+  "ios-card glass relative flex min-h-[60px] min-w-0 flex-1 items-center justify-between gap-1 rounded-[22px] pl-4 pr-3.5 text-left text-foreground disabled:opacity-40";
 const inputClass =
   "box-border flex h-11 w-full min-w-0 max-w-full appearance-none items-center rounded-xl border border-border bg-clip-padding px-3 py-0 text-left text-[17px] leading-none text-foreground [-webkit-appearance:none] [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:text-left";
 
@@ -203,7 +203,7 @@ export function DayEditPanels({
                 value={draft.start}
                 onChange={(ev) => setDraft({ ...draft, start: ev.target.value })}
                 className={inputClass}
-                style={{ backgroundColor: "var(--app-chip)" }}
+                style={{ backgroundColor: "var(--glass-chip)" }}
               />
             </label>
             <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
@@ -213,7 +213,7 @@ export function DayEditPanels({
                 value={draft.end}
                 onChange={(ev) => setDraft({ ...draft, end: ev.target.value })}
                 className={inputClass}
-                style={{ backgroundColor: "var(--app-chip)" }}
+                style={{ backgroundColor: "var(--glass-chip)" }}
               />
             </label>
           </div>
@@ -306,7 +306,7 @@ export function DayEditPanels({
 
         <div
           className="flex items-baseline justify-between rounded-xl px-3 py-2.5"
-          style={{ backgroundColor: "var(--app-chip)" }}
+          style={{ backgroundColor: "var(--glass-chip)" }}
         >
           <div>
             <div className="text-xs text-muted-foreground">Orario ordinario</div>
@@ -355,7 +355,7 @@ export function DayEditPanels({
               value={otDraft.dur}
               onChange={(ev) => setOtDraft({ ...otDraft, dur: ev.target.value })}
               className={inputClass}
-              style={{ backgroundColor: "var(--app-chip)" }}
+              style={{ backgroundColor: "var(--glass-chip)" }}
             />
           </label>
         )}
