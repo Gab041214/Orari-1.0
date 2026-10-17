@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText, ArrowRight, ArrowLeftRight, X } from "lucide-react";
 import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
@@ -338,9 +338,14 @@ function blockData(row: string[], cols: number[]): DayData {
   return shiftFromTimes(values[0] ?? "", values[values.length - 1] ?? "");
 }
 
-const SWIPE_ACTION_WIDTH = 44; // un pulsante da 36px + 8px di margine: a sinistra "modifica", a destra "elimina"
+const SWIPE_PILL = 80; // larghezza della pillola con l'icona
+const SWIPE_REST = 100; // posizione di riposo: 10px + pillola + 10px. A sinistra "modifica", a destra "elimina"
+const SWIPE_RUBBER = 24; // corsa elastica oltre il punto di riposo
+const SWIPE_OPEN_FROM_CLOSED = SWIPE_REST * 0.4; // da chiusa: basta poco per aprire
+const SWIPE_CLOSE_FROM_OPEN = SWIPE_REST * 0.75; // da aperta: va riportata quasi al bordo per richiudere
+const SWIPE_EASE = "cubic-bezier(.2,1.1,.3,1)";
 
-/** Riga voce con swipe da destra verso sinistra: rivela modifica (blu) ed elimina (rosso). Tocco semplice = seleziona. */
+/** Riga voce con swipe stile Mail: verso destra compare "modifica" (blu), verso sinistra "elimina" (rosso). Tocco semplice = seleziona. */
 function EntryRow({
   name,
   selected,
@@ -374,7 +379,15 @@ function EntryRow({
     if (!dragging) return;
     const delta = startX.current - e.clientX;
     if (Math.abs(delta) > 4) moved.current = true;
-    setReveal(Math.min(SWIPE_ACTION_WIDTH, Math.max(-SWIPE_ACTION_WIDTH, startReveal.current + delta)));
+    // Se la riga parte aperta da un lato, si ferma sul bordo originale: l'altro pulsante non compare per sbaglio.
+    const start = startReveal.current;
+    const lo = start > 0 ? 0 : -SWIPE_REST * 2;
+    const hi = start < 0 ? 0 : SWIPE_REST * 2;
+    let v = Math.min(hi, Math.max(lo, start + delta));
+    if (Math.abs(v) > SWIPE_REST) {
+      v = Math.sign(v) * (SWIPE_REST + Math.min(SWIPE_RUBBER, (Math.abs(v) - SWIPE_REST) * 0.25));
+    }
+    setReveal(v);
   };
   const onPointerUp = () => {
     if (!dragging) return;
@@ -385,10 +398,26 @@ function EntryRow({
       else setReveal(0);
       return;
     }
-    setReveal((current) =>
-      Math.abs(current) > SWIPE_ACTION_WIDTH / 2 ? Math.sign(current) * SWIPE_ACTION_WIDTH : 0,
-    );
+    const threshold = startReveal.current === 0 ? SWIPE_OPEN_FROM_CLOSED : SWIPE_CLOSE_FROM_OPEN;
+    setReveal((current) => (Math.abs(current) < threshold ? 0 : Math.sign(current) * SWIPE_REST));
   };
+
+  // Pillola che si allarga man mano che la riga scorre e si ferma a SWIPE_PILL quando è esposta del tutto.
+  const pillStyle = (amount: number, side: "left" | "right"): CSSProperties => {
+    const p = Math.min(1, amount / SWIPE_REST);
+    return {
+      [side]: 10,
+      width: amount > 0 ? Math.min(SWIPE_PILL, Math.max(40, amount - 20)) : 40,
+      opacity: Math.min(1, p * 1.4),
+      transform: `scale(${0.4 + 0.6 * p})`,
+      pointerEvents: p >= 1 ? "auto" : "none",
+      transition: dragging
+        ? "none"
+        : `width .42s ${SWIPE_EASE}, opacity .3s, transform .42s ${SWIPE_EASE}`,
+    };
+  };
+  const editAmount = reveal < 0 ? -reveal : 0;
+  const deleteAmount = reveal > 0 ? reveal : 0;
 
   const confirmRename = () => {
     const v = draft.trim();
@@ -399,58 +428,41 @@ function EntryRow({
   return (
     <li className="relative h-11 shrink-0 overflow-hidden rounded-[14px]">
       {/* Scorrendo la riga verso destra compare "modifica" a sinistra; verso sinistra "elimina" a destra.
-          Le righe sono trasparenti: i pulsanti si mostrano solo quando la riga è scorsa. */}
-      <div
-        className="absolute inset-y-0 left-0 flex items-center justify-start"
-        style={{
-          width: SWIPE_ACTION_WIDTH,
-          opacity: reveal < 0 ? 1 : 0,
-          pointerEvents: reveal < 0 ? "auto" : "none",
-          transition: "opacity 0.12s ease",
+          Le righe sono trasparenti: le pillole si mostrano solo quando la riga è scorsa. */}
+      <button
+        type="button"
+        aria-label={`Modifica ${name}`}
+        aria-hidden={editAmount === 0}
+        tabIndex={editAmount === 0 ? -1 : 0}
+        className="absolute top-1/2 -mt-5 flex h-10 items-center justify-center rounded-full bg-[#0A84FF] text-white"
+        style={pillStyle(editAmount, "left")}
+        onClick={() => {
+          setDraft(name);
+          setEditing(true);
+          setReveal(0);
         }}
-        aria-hidden={reveal >= 0}
       >
-        <button
-          type="button"
-          aria-label={`Modifica ${name}`}
-          className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#0A84FF] text-white"
-          onClick={() => {
-            setDraft(name);
-            setEditing(true);
-            setReveal(0);
-          }}
-        >
-          <Keyboard className="size-[18px]" />
-        </button>
-      </div>
-      <div
-        className="absolute inset-y-0 right-0 flex items-center justify-end"
-        style={{
-          width: SWIPE_ACTION_WIDTH,
-          opacity: reveal > 0 ? 1 : 0,
-          pointerEvents: reveal > 0 ? "auto" : "none",
-          transition: "opacity 0.12s ease",
-        }}
-        aria-hidden={reveal <= 0}
+        <Keyboard className="size-5" />
+      </button>
+      <button
+        type="button"
+        aria-label={`Elimina ${name}`}
+        aria-hidden={deleteAmount === 0}
+        tabIndex={deleteAmount === 0 ? -1 : 0}
+        className="absolute top-1/2 -mt-5 flex h-10 items-center justify-center rounded-full bg-[#FF3B30] text-white"
+        style={pillStyle(deleteAmount, "right")}
+        onClick={onDelete}
       >
-        <button
-          type="button"
-          aria-label={`Elimina ${name}`}
-          className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#FF3B30] text-white"
-          onClick={onDelete}
-        >
-          <Trash2 className="size-[18px]" />
-        </button>
-      </div>
+        <Trash2 className="size-5" />
+      </button>
       <div
         className={cn(
-          "relative flex h-11 touch-pan-y cursor-pointer items-center overflow-hidden rounded-[14px] px-3",
-          selected && "bg-[var(--glass-chip)]",
+          "relative flex h-11 w-full touch-pan-y cursor-pointer items-center overflow-hidden rounded-[14px] px-3",
+          (selected || dragging || reveal !== 0) && "bg-[var(--glass-chip)]",
         )}
         style={{
-          width: `calc(100% - ${Math.abs(reveal)}px)`,
-          marginLeft: reveal < 0 ? -reveal : 0,
-          transition: dragging ? "none" : "width 0.2s ease, margin-left 0.2s ease",
+          transform: `translateX(${-reveal}px)`,
+          transition: dragging ? "none" : `transform .42s ${SWIPE_EASE}, background-color .25s`,
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -472,7 +484,7 @@ function EntryRow({
           />
         ) : (
           <>
-            <span className="flex-1 truncate text-sm text-foreground">{name}</span>
+            <span className="flex-1 truncate text-base text-foreground">{name}</span>
             {selected && <Check className="size-4 shrink-0 text-foreground" />}
           </>
         )}
