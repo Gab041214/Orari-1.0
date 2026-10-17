@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
+import { Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText, ArrowRight, X } from "lucide-react";
 import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
+import { aliasLookup, loadAliases, nameDistance, rankSimilar, saveAliases, withAlias, type Alias } from "@/lib/aliases";
 import { Button } from "@/components/ui/button";
 
 
@@ -240,16 +241,15 @@ function contrastTextColor(hex: string): string {
 type WeekData = { monday: Date | undefined; days: DayData[]; mods: boolean[]; files: DayData[] };
 
 /**
- * Confronta il nominativo del calendario con il valore della cella Excel in modo
- * tollerante: normalizza entrambi (minuscolo, spazi multipli ridotti) e considera
- * corrispondenza anche se uno dei due è contenuto nell'altro — così "Rossi" trova
- * una cella "Mario Rossi", e viceversa.
+ * Confronta il nominativo del calendario con il valore della cella Excel: stessa scrittura
+ * (senza distinguere maiuscole e spazi multipli) oppure grafia collegata dall'utente a quel nome
+ * ("Rosi" -> "Rossi"). Niente corrispondenze parziali: "Rossi" e "Rossi M." sono due persone.
  */
-function nameMatches(cellValue: string, selected: string): boolean {
+function nameMatches(cellValue: string, selected: string, aliases?: Map<string, string>): boolean {
   const cell = norm(cellValue);
   const sel = norm(selected);
   if (!sel || !cell) return false;
-  return cell === sel || cell.includes(sel) || sel.includes(cell);
+  return cell === sel || aliases?.get(cell) === sel;
 }
 
 /**
@@ -284,7 +284,7 @@ function weeksInFile(rows: string[][]): number {
  * compare solo in alcune settimane (o entra a metà mese) resta sui giorni giusti. Se il file non ha
  * intestazioni si contano le righe in cui compare il nome.
  */
-function offsetMapForName(rows: string[][], name: string): Map<number, DayData> {
+function offsetMapForName(rows: string[][], name: string, aliases?: Map<string, string>): Map<number, DayData> {
   const byOffset = new Map<number, DayData>();
   const put = (row: string[], base: number) => {
     byOffset.set(base, blockData(row, DAY_BLOCKS[6]!));
@@ -294,7 +294,7 @@ function offsetMapForName(rows: string[][], name: string): Map<number, DayData> 
   };
 
   if (!rows.some(isWeekHeader)) {
-    rows.filter((r) => nameMatches(r[1] ?? "", name)).forEach((row, i) => put(row, i * 7));
+    rows.filter((r) => nameMatches(r[1] ?? "", name, aliases)).forEach((row, i) => put(row, i * 7));
     return byOffset;
   }
 
@@ -306,7 +306,7 @@ function offsetMapForName(rows: string[][], name: string): Map<number, DayData> 
       week++;
       continue;
     }
-    if (week < 0 || !nameMatches(r[1] ?? "", name)) continue;
+    if (week < 0 || !nameMatches(r[1] ?? "", name, aliases)) continue;
     const exact = norm(r[1] ?? "") === norm(name);
     const cur = best.get(week);
     if (!cur || (exact && !cur.exact)) best.set(week, { row: r, exact });
@@ -512,6 +512,20 @@ function Index() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [overtimeOpen, setOvertimeOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Nomi collegati (grafia nel file -> nome in elenco) e relativi pannelli.
+  const [aliases, setAliases] = useState<Alias[]>([]);
+  const aliasMap = useMemo(() => aliasLookup(aliases), [aliases]);
+  const commitAliases = (next: Alias[]) => {
+    setAliases(next);
+    saveAliases(next);
+  };
+  // Nome nuovo per cui si sta chiedendo "è lo stesso di…?", e nome scelto.
+  const [linking, setLinking] = useState<string | null>(null);
+  const [linkTarget, setLinkTarget] = useState<string | null>(null);
+  // Modulo "Collega due nomi" nelle opzioni avanzate.
+  const [linkFormOpen, setLinkFormOpen] = useState(false);
+  const [linkFrom, setLinkFrom] = useState("");
+  const [linkTo, setLinkTo] = useState("");
   // Esito dell'ultima esportazione/importazione delle modifiche, mostrato sotto i pulsanti.
   const [backupNote, setBackupNote] = useState<{ title: string; body: string } | null>(null);
   const backupRef = useRef<HTMLInputElement>(null);
@@ -571,6 +585,7 @@ function Index() {
       const acc = Number(localStorage.getItem(ACCENT_KEY));
       if (Number.isInteger(acc) && acc >= 0 && acc < ACCENT_PAIRS.length) setAccentIdx(acc);
       setOverrides(loadOverrides());
+      setAliases(loadAliases());
       setFiles(loadFiles());
       const sel = localStorage.getItem(SELECTED_KEY);
       if (sel) setSelected(sel);
@@ -655,9 +670,9 @@ function Index() {
     return sortedOptions.filter(
       (o) =>
         o === selected ||
-        currentFile.rows.some((r) => looksLikeRealName(r[1] ?? "") && nameMatches(r[1] ?? "", o)),
+        currentFile.rows.some((r) => looksLikeRealName(r[1] ?? "") && nameMatches(r[1] ?? "", o, aliasMap)),
     );
-  }, [currentFile, sortedOptions, selected]);
+  }, [currentFile, sortedOptions, selected, aliasMap]);
 
   // File ordinati con la loro domenica di partenza.
   const fileList = useMemo(
@@ -671,11 +686,11 @@ function Index() {
     const all = new Map<string, Map<string, Map<number, DayData>>>();
     for (const f of fileList) {
       const perName = new Map<string, Map<number, DayData>>();
-      for (const name of names) perName.set(name, offsetMapForName(f.rows, name));
+      for (const name of names) perName.set(name, offsetMapForName(f.rows, name, aliasMap));
       all.set(f.key, perName);
     }
     return all;
-  }, [fileList, options, selected]);
+  }, [fileList, options, selected, aliasMap]);
 
   // Turno di un nominativo in una data, preso dal file giusto: prima quello del mese della data, poi gli altri.
   const resolveDay = useMemo(
@@ -805,8 +820,50 @@ function Index() {
       seen.add(key);
       candidates.push(raw);
     }
-    return candidates.filter((name) => !options.some((o) => nameMatches(name, o)));
-  }, [rows, options, dismissedSuggestions]);
+    return candidates.filter((name) => !options.some((o) => nameMatches(name, o, aliasMap)));
+  }, [rows, options, dismissedSuggestions, aliasMap]);
+
+  // Nome nuovo di cui si chiede se è lo stesso di uno in elenco (sparisce se non è più proposto).
+  const linkingName = linking && suggestedNames.includes(linking) ? linking : null;
+  const similarOptions = useMemo(
+    () => (linkingName ? rankSimilar(linkingName, options).slice(0, 8) : []),
+    [linkingName, options],
+  );
+  const openLink = (name: string) => {
+    if (options.length === 0) {
+      persist([...options, name]);
+      return;
+    }
+    const best = rankSimilar(name, options)[0];
+    setLinking(name);
+    setLinkTarget(best && nameDistance(name, best) <= 0.5 ? best : null);
+  };
+  // Nomi scritti nei file che non sono in elenco né già collegati: suggerimenti per "Collega due nomi".
+  const fileNameChoices = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const f of fileList) {
+      for (const r of f.rows) {
+        const raw = (r[1] ?? "").trim();
+        const key = norm(raw);
+        if (!looksLikeRealName(raw) || seen.has(key)) continue;
+        seen.add(key);
+        if (options.some((o) => norm(o) === key) || aliasMap.has(key)) continue;
+        out.push(raw);
+      }
+    }
+    return out.sort((a, b) => a.localeCompare(b, "it", { sensitivity: "base" }));
+  }, [fileList, options, aliasMap]);
+  const linkFromKey = norm(linkFrom);
+  const linkFormError = !linkFromKey
+    ? null
+    : options.some((o) => norm(o) === linkFromKey)
+      ? `«${linkFrom.trim()}» è già in elenco: eliminalo prima dal menu dei nomi.`
+      : linkTo && norm(linkTo) === linkFromKey
+        ? "Scegli due nomi diversi."
+        : null;
+  const canLink = !!linkFromKey && !!linkTo && !linkFormError;
+
 
   const openDayPopup = (date: Date | undefined) => {
     if (!date || !hasFiles) return;
@@ -1093,11 +1150,15 @@ function Index() {
                           }}
                           onDelete={() => {
                             persist(options.filter((x) => x !== o));
+                            if (aliases.some((a) => a.to === o)) commitAliases(aliases.filter((a) => a.to !== o));
                             if (selected === o) setSelected("");
                           }}
                           onRename={(newName) => {
                             if (options.includes(newName)) return;
                             persist(options.map((x) => (x === o ? newName : x)));
+                            if (aliases.some((a) => a.to === o)) {
+                              commitAliases(aliases.map((a) => (a.to === o ? { ...a, to: newName } : a)));
+                            }
                             if (selected === o) setSelected(newName);
                           }}
                         />
@@ -1294,6 +1355,99 @@ function Index() {
                             <p className="text-muted-foreground">{backupNote.body}</p>
                           </div>
                         )}
+                        <div className="-mx-3 my-2.5 h-px bg-border" />
+                        <p className="mb-1.5 text-xs font-medium text-muted-foreground">Nomi collegati</p>
+                        {aliases.length === 0 && (
+                          <p className="mb-1.5 text-xs text-muted-foreground">Nessun nome collegato.</p>
+                        )}
+                        {aliases.map((a) => (
+                          <div
+                            key={a.from}
+                            className="mb-1.5 flex min-h-10 items-center gap-2 rounded-[10px] px-2.5 text-sm text-foreground"
+                            style={{ backgroundColor: "var(--app-chip)" }}
+                          >
+                            <span className="min-w-0 truncate">{a.from}</span>
+                            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0 flex-1 truncate font-semibold">{a.to}</span>
+                            <button
+                              type="button"
+                              aria-label={`Scollega ${a.from}`}
+                              onClick={() => commitAliases(aliases.filter((x) => x.from !== a.from))}
+                              className="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
+                            >
+                              <X className="size-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          aria-expanded={linkFormOpen}
+                          onClick={() => setLinkFormOpen((o) => !o)}
+                          className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[10px] px-2.5 text-sm font-semibold text-foreground"
+                          style={{ backgroundColor: "var(--app-chip)" }}
+                        >
+                          <Plus className="size-4 shrink-0" />
+                          Collega due nomi
+                        </button>
+                        {linkFormOpen && (
+                          <div className="animate-in fade-in-0 slide-in-from-top-1 mt-2 rounded-[10px] border border-border p-2.5 duration-200 motion-reduce:animate-none">
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="link-from">
+                              Nome scritto male (come nel file)
+                            </label>
+                            <input
+                              id="link-from"
+                              list="orari-file-names"
+                              value={linkFrom}
+                              onChange={(e) => setLinkFrom(e.target.value)}
+                              autoComplete="off"
+                              className="mb-2.5 h-9 w-full rounded-xl border border-border bg-card px-2.5 text-[16px] text-foreground"
+                            />
+                            <datalist id="orari-file-names">
+                              {fileNameChoices.map((n) => (
+                                <option key={n} value={n} />
+                              ))}
+                            </datalist>
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="link-to">
+                              Si legge come (nome in elenco)
+                            </label>
+                            <select
+                              id="link-to"
+                              value={linkTo}
+                              onChange={(e) => setLinkTo(e.target.value)}
+                              className="mb-2.5 h-9 w-full rounded-xl border border-border bg-card px-2 text-[16px] text-foreground"
+                            >
+                              <option value="">Scegli…</option>
+                              {sortedOptions.map((o) => (
+                                <option key={o} value={o}>
+                                  {o}
+                                </option>
+                              ))}
+                            </select>
+                            {linkFormError && <p className="mb-2 text-xs text-destructive">{linkFormError}</p>}
+                            <div className="flex gap-2">
+                              <Button
+                                disabled={!canLink}
+                                className="flex-1 rounded-xl text-[13px] text-white hover:opacity-90"
+                                style={{ backgroundColor: "var(--app-upload)" }}
+                                onClick={() => {
+                                  commitAliases(withAlias(aliases, linkFrom, linkTo));
+                                  setLinkFrom("");
+                                  setLinkTo("");
+                                  setLinkFormOpen(false);
+                                }}
+                              >
+                                Collega
+                              </Button>
+                              <button
+                                type="button"
+                                onClick={() => setLinkFormOpen(false)}
+                                className="rounded-xl border border-border bg-card px-3.5 py-2 text-[13px] text-foreground"
+                              >
+                                Annulla
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </PopoverContent>
@@ -1305,33 +1459,90 @@ function Index() {
 
             {suggestedNames.length > 0 && (
               <div className="mt-2 rounded-xl border border-border/60 bg-secondary/60 p-2.5">
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">Nominativi trovati nel file, non in elenco:</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDismissedSuggestions(
-                        (prev) => new Set([...prev, ...suggestedNames.map((n) => norm(n))]),
-                      )
-                    }
-                    className="shrink-0 text-xs text-muted-foreground underline"
-                  >
-                    Ignora
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {suggestedNames.map((name) => (
+                {linkingName ? (
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">«{linkingName}» è lo stesso di…?</p>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      Scegli il nome giusto: da ora «{linkingName}» sarà letto come quel nome.
+                    </p>
+                    <div className="mb-2.5 flex flex-wrap gap-1.5">
+                      {similarOptions.map((o) => (
+                        <button
+                          key={o}
+                          type="button"
+                          aria-pressed={linkTarget === o}
+                          onClick={() => setLinkTarget(o)}
+                          className={cn(
+                            "rounded-full border bg-card px-2.5 py-1 text-xs text-foreground",
+                            linkTarget === o ? "border-foreground font-semibold ring-1 ring-foreground" : "border-border",
+                          )}
+                        >
+                          {o}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        disabled={!linkTarget}
+                        className="min-w-0 flex-1 truncate rounded-xl text-[13px] text-white hover:opacity-90"
+                        style={{ backgroundColor: "var(--app-upload)" }}
+                        onClick={() => {
+                          if (linkTarget) commitAliases(withAlias(aliases, linkingName, linkTarget));
+                          setLinking(null);
+                        }}
+                      >
+                        {linkTarget ? `Collega a ${linkTarget}` : "Collega"}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          persist([...options, linkingName]);
+                          setLinking(null);
+                        }}
+                        className="shrink-0 rounded-xl border border-border bg-card px-2.5 py-2 text-[13px] text-foreground"
+                      >
+                        È un collega nuovo
+                      </button>
+                    </div>
                     <button
-                      key={name}
                       type="button"
-                      onClick={() => persist([...options, name])}
-                      className="flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground"
+                      onClick={() => setLinking(null)}
+                      className="mt-2 w-full text-center text-xs text-muted-foreground underline"
                     >
-                      <Plus className="size-3" />
-                      {name}
+                      Annulla
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">Nominativi trovati nel file, non in elenco:</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDismissedSuggestions(
+                            (prev) => new Set([...prev, ...suggestedNames.map((n) => norm(n))]),
+                          )
+                        }
+                        className="shrink-0 text-xs text-muted-foreground underline"
+                      >
+                        Ignora
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestedNames.map((name) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => openLink(name)}
+                          className="flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground"
+                        >
+                          <Plus className="size-3" />
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
