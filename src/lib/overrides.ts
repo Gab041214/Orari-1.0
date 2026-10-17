@@ -68,3 +68,23 @@ export function updateOverride(
   else delete next[month];
   return next;
 }
+
+/** Sposta le modifiche del nominativo `from` su `to` (se `to` ha già modifiche nello stesso giorno, restano le sue). */
+export function renameOverrides(store: OverrideStore, from: string, to: string): OverrideStore {
+  if (from === to) return store;
+  const next: OverrideStore = {};
+  for (const [month, days] of Object.entries(store)) {
+    const nextDays: Record<string, Record<string, DayOverride>> = {};
+    for (const [day, names] of Object.entries(days)) {
+      const moved: Record<string, DayOverride> = {};
+      for (const [name, ov] of Object.entries(names)) {
+        if (name === from) continue;
+        moved[name] = ov;
+      }
+      if (names[from] && !moved[to]) moved[to] = names[from]!;
+      if (Object.keys(moved).length > 0) nextDays[day] = moved;
+    }
+    if (Object.keys(nextDays).length > 0) next[month] = nextDays;
+  }
+  return next;
+}
