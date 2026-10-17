@@ -276,7 +276,7 @@ export function DayEditPanels({
       ? `Straordinario ${preview.ot.start} – ${preview.ot.end}. Totale con ordinario: ${preview.total ?? ""}`
       : "";
 
-  const segClass = "min-h-11 min-w-0 flex-1 whitespace-nowrap rounded-xl px-0.5 text-center text-[13px] tracking-tight";
+  const segClass = "min-h-11 min-w-0 flex-1 whitespace-nowrap rounded-xl px-0.5 text-center seg-label tracking-tight";
   const dim = wholeShift ? "opacity-40" : "";
   const segStyle = (on: boolean) =>
     on ? { backgroundColor: accent, color: accentText } : undefined;
