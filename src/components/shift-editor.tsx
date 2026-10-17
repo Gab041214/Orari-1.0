@@ -317,7 +317,7 @@ export function DayEditPanels({
           <div className="text-sm text-muted-foreground">{ordinaryHours}</div>
         </div>
 
-        <div className="flex gap-1.5">
+        <div className="flex gap-1">
           <button
             type="button"
             aria-pressed={otDraft.side === "before"}
