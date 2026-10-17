@@ -192,6 +192,16 @@
     border: 1px solid var(--glass-bd);
     box-shadow: var(--glass-shadow);
   }
+  /* Pulsanti "Aggiungi prima / Aggiungi dopo / Tutto il turno": 13px su iOS (invariato), 12px altrove
+     perché su Android (Huawei) la "a" finale usciva appena dal bordo. */
+  .seg-label {
+    font-size: 12px;
+  }
+  @supports (-webkit-touch-callout: none) {
+    .seg-label {
+      font-size: 13px;
+    }
+  }
 }
 
 @keyframes ios-in {
