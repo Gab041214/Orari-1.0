@@ -577,6 +577,20 @@ function Index() {
     return () => document.removeEventListener("pointerdown", onDown);
   }, [peekKey]);
 
+  // Finestre aperte sopra il calendario (menu mese, nomi, impostazioni, riquadri dei pallini): il tocco che
+  // le chiude non deve arrivare anche alla tessera sotto. Prima del tocco si memorizza se ce n'era una
+  // aperta; il clic sulla tessera, se sì, viene ignorato. Dal tocco dopo le tessere rispondono di nuovo.
+  const overlayOpenRef = useRef(false);
+  const ignoreTileClickRef = useRef(false);
+  overlayOpenRef.current = monthMenuOpen || namesOpen || settingsOpen || peekKey !== null;
+  useEffect(() => {
+    const onDown = () => {
+      ignoreTileClickRef.current = overlayOpenRef.current;
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, []);
+
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -1643,7 +1657,13 @@ function Index() {
                         "@container relative h-24 cursor-pointer transition-opacity duration-200 sm:h-[148px]",
                         outside && !peekOpen && "opacity-50",
                       )}
-                      onClick={() => openDayPopup(date)}
+                      onClick={() => {
+                        if (ignoreTileClickRef.current) {
+                          ignoreTileClickRef.current = false;
+                          return;
+                        }
+                        openDayPopup(date);
+                      }}
                     >
                       {/* Data: posizione fissa, indipendente dall'altezza della tessera */}
                       <div className="absolute inset-x-0 top-1 z-10 pb-1 text-center sm:top-2">
