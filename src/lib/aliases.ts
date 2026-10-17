@@ -74,3 +74,11 @@ export function rankSimilar(name: string, options: string[]): string[] {
     (x, y) => nameDistance(name, x) - nameDistance(name, y) || x.localeCompare(y, "it", { sensitivity: "base" }),
   );
 }
+
+/** Differenza massima (circa un terzo del nome) per considerare due nomi "simili". */
+export const SIMILAR_MAX = 0.34;
+
+/** I nomi dell'elenco simili a `name` (probabile errore di battitura), dal più simile. */
+export function similarNames(name: string, options: string[]): string[] {
+  return rankSimilar(name, options).filter((o) => nameDistance(name, o) <= SIMILAR_MAX);
+}
