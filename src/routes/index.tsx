@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText, ArrowRight, X } from "lucide-react";
+import { Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText, ArrowRight, ArrowLeftRight, X } from "lucide-react";
 import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -27,6 +27,7 @@ import {
   loadOverrides,
   monthKey,
   saveOverrides,
+  renameOverrides,
   updateOverride,
   type DayOverride,
   type OverrideStore,
@@ -849,7 +850,7 @@ function Index() {
         const key = norm(raw);
         if (!looksLikeRealName(raw) || seen.has(key)) continue;
         seen.add(key);
-        if (options.some((o) => norm(o) === key) || aliasMap.has(key)) continue;
+        if (aliasMap.has(key)) continue;
         out.push(raw);
       }
     }
@@ -858,12 +859,44 @@ function Index() {
   const linkFromKey = norm(linkFrom);
   const linkFormError = !linkFromKey
     ? null
-    : options.some((o) => norm(o) === linkFromKey)
-      ? `«${linkFrom.trim()}» è già in elenco: eliminalo prima dal menu dei nomi.`
-      : linkTo && norm(linkTo) === linkFromKey
-        ? "Scegli due nomi diversi."
-        : null;
+    : linkTo && norm(linkTo) === linkFromKey
+      ? "Scegli due nomi diversi."
+      : null;
   const canLink = !!linkFromKey && !!linkTo && !linkFormError;
+
+  // Il nome in elenco `name` passa a `to`: le sue modifiche manuali lo seguono e, se serve, anche la selezione.
+  const moveOverrides = (name: string, to: string) => {
+    const next = renameOverrides(overrides, name, to);
+    setOverrides(next);
+    saveOverrides(next);
+    if (selected === name) setSelected(to);
+  };
+  // Collega la grafia `from` al nome `to`; se `from` era già stato aggiunto in elenco ne esce.
+  const linkNames = (from: string, to: string) => {
+    commitAliases(withAlias(aliases, from, to));
+    const added = options.find((o) => norm(o) === norm(from));
+    if (added) {
+      persist(options.filter((o) => o !== added));
+      moveOverrides(added, to);
+    }
+  };
+  // Scambia il collegamento: il nome giusto diventa la grafia (prima sbagliata) e viceversa.
+  const swapAlias = (a: Alias) => {
+    const oldName = options.find((o) => norm(o) === norm(a.to)) ?? a.to;
+    const rest = aliases
+      .filter((x) => x.from !== a.from)
+      .map((x) => (norm(x.to) === norm(a.to) ? { ...x, to: a.from } : x));
+    commitAliases(withAlias(rest, a.to, a.from));
+    const newInList = options.find((o) => norm(o) === norm(a.from));
+    persist(
+      newInList
+        ? options.filter((o) => o !== oldName)
+        : options.some((o) => o === oldName)
+          ? options.map((o) => (o === oldName ? a.from : o))
+          : [...options, a.from],
+    );
+    moveOverrides(oldName, newInList ?? a.from);
+  };
 
 
   const openDayPopup = (date: Date | undefined) => {
@@ -1372,6 +1405,15 @@ function Index() {
                             <span className="min-w-0 flex-1 truncate font-semibold">{a.to}</span>
                             <button
                               type="button"
+                              aria-label={`Usa «${a.from}» come nome giusto`}
+                              title="Scambia: il nome giusto diventa quello a sinistra"
+                              onClick={() => swapAlias(a)}
+                              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
+                            >
+                              <ArrowLeftRight className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
                               aria-label={`Scollega ${a.from}`}
                               onClick={() => commitAliases(aliases.filter((x) => x.from !== a.from))}
                               className="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
@@ -1431,7 +1473,7 @@ function Index() {
                                 className="flex-1 rounded-xl text-[13px] text-white hover:opacity-90"
                                 style={{ backgroundColor: "var(--app-upload)" }}
                                 onClick={() => {
-                                  commitAliases(withAlias(aliases, linkFrom, linkTo));
+                                  linkNames(linkFrom.trim(), linkTo);
                                   setLinkFrom("");
                                   setLinkTo("");
                                   setLinkFormOpen(false);
@@ -1488,7 +1530,7 @@ function Index() {
                         className="min-w-0 flex-1 truncate rounded-xl text-[13px] text-white hover:opacity-90"
                         style={{ backgroundColor: "var(--app-upload)" }}
                         onClick={() => {
-                          if (linkTarget) commitAliases(withAlias(aliases, linkingName, linkTarget));
+                          if (linkTarget) linkNames(linkingName, linkTarget);
                           setLinking(null);
                         }}
                       >
