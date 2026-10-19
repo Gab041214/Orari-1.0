@@ -261,6 +261,13 @@
   animation: ios-out 0.18s ease-in forwards;
 }
 
+/* Le schede del pop-up stanno in un contenitore scorrevole che taglia ciò che esce dai suoi bordi: l'ombra
+   morbida e ampia delle schede appariva come un rettangolo grigio attorno al pop-up. Qui l'ombra è corta e
+   resta dentro i margini del contenitore. */
+.ios-dialog .glass {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ios-in,
   .ios-pop[data-state],
