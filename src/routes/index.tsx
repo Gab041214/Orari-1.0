@@ -243,7 +243,7 @@ type WeekData = { monday: Date | undefined; days: DayData[]; mods: boolean[]; fi
 
 /**
  * Confronta il nominativo del calendario con il valore della cella Excel: stessa scrittura
- * (senza distinguere maiuscole e spazi multipli) oppure grafia collegata dall'utente a quel nome
+ * (senza distinguere maiuscole e spazi multipli) oppure grafia associata dall'utente a quel nome
  * ("Rosi" -> "Rossi"). Niente corrispondenze parziali: "Rossi" e "Rossi M." sono due persone.
  */
 function nameMatches(cellValue: string, selected: string, aliases?: Map<string, string>): boolean {
@@ -547,6 +547,8 @@ function Index() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [overtimeOpen, setOvertimeOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // "Altre opzioni" (nomi associati): contratta a ogni apertura del menu.
+  const [moreOpen, setMoreOpen] = useState(false);
   // Nomi collegati (grafia nel file -> nome in elenco) e relativi pannelli.
   const [aliases, setAliases] = useState<Alias[]>([]);
   const aliasMap = useMemo(() => aliasLookup(aliases), [aliases]);
@@ -557,7 +559,7 @@ function Index() {
   // Nome nuovo per cui si sta chiedendo "è lo stesso di…?", e nome scelto.
   const [linking, setLinking] = useState<string | null>(null);
   const [linkTarget, setLinkTarget] = useState<string | null>(null);
-  // Modulo "Collega due nomi" nelle opzioni avanzate.
+  // Modulo "Associa due nomi" nelle opzioni avanzate.
   const [linkFormOpen, setLinkFormOpen] = useState(false);
   const [linkFrom, setLinkFrom] = useState("");
   const [linkTo, setLinkTo] = useState("");
@@ -888,7 +890,7 @@ function Index() {
     setLinking(name);
     setLinkTarget(best);
   };
-  // Nomi scritti nei file che non sono in elenco né già collegati: suggerimenti per "Collega due nomi".
+  // Nomi scritti nei file che non sono in elenco né già collegati: suggerimenti per "Associa due nomi".
   const fileNameChoices = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -1281,6 +1283,7 @@ function Index() {
                     if (!o) {
                       setOvertimeOpen(false);
                       setAdvancedOpen(false);
+                      setMoreOpen(false);
                       setBackupNote(null);
                     }
                   }}
@@ -1391,7 +1394,10 @@ function Index() {
                       <button
                         type="button"
                         aria-expanded={advancedOpen}
-                        onClick={() => setAdvancedOpen((o) => !o)}
+                        onClick={() => {
+                          setAdvancedOpen((o) => !o);
+                          setMoreOpen(false);
+                        }}
                         className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 text-[13px] font-semibold text-foreground"
                       >
                         Opzioni avanzate
@@ -1437,10 +1443,21 @@ function Index() {
                             <p className="text-muted-foreground">{backupNote.body}</p>
                           </div>
                         )}
-                        <div className="-mx-3.5 my-2.5 h-px bg-[var(--glass-sep)]" />
-                        <p className="mb-1.5 text-xs font-medium text-muted-foreground">Nomi collegati</p>
+                        <div className="-mx-3.5 mt-2.5 mb-0.5 h-px bg-[var(--glass-sep)]" />
+                        <button
+                          type="button"
+                          aria-expanded={moreOpen}
+                          onClick={() => setMoreOpen((o) => !o)}
+                          className="flex min-h-11 w-full items-center justify-start gap-1 whitespace-nowrap px-2.5 text-[13px] font-semibold text-foreground"
+                        >
+                          Altre opzioni
+                          <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", moreOpen && "rotate-180")} />
+                        </button>
+                        {moreOpen && (
+                        <div className="animate-in fade-in-0 slide-in-from-top-1 pt-1 duration-200 motion-reduce:animate-none">
+                        <p className="mb-1.5 text-xs font-medium text-muted-foreground">Nomi associati</p>
                         {aliases.length === 0 && (
-                          <p className="mb-1.5 text-xs text-muted-foreground">Nessun nome collegato.</p>
+                          <p className="mb-1.5 text-xs text-muted-foreground">Nessun nome associato.</p>
                         )}
                         {aliases.map((a) => (
                           <div
@@ -1462,7 +1479,7 @@ function Index() {
                             </button>
                             <button
                               type="button"
-                              aria-label={`Scollega ${a.from}`}
+                              aria-label={`Separa ${a.from}`}
                               onClick={() => commitAliases(aliases.filter((x) => x.from !== a.from))}
                               className="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
                             >
@@ -1478,7 +1495,7 @@ function Index() {
                           style={{ backgroundColor: "var(--glass-chip)" }}
                         >
                           <Plus className="size-4 shrink-0" />
-                          Collega due nomi
+                          Associa due nomi
                         </button>
                         {linkFormOpen && (
                           <div className="animate-in fade-in-0 slide-in-from-top-1 mt-2 rounded-[14px] border border-border p-2.5 duration-200 motion-reduce:animate-none">
@@ -1527,7 +1544,7 @@ function Index() {
                                   setLinkFormOpen(false);
                                 }}
                               >
-                                Collega
+                                Associa
                               </Button>
                               <button
                                 type="button"
@@ -1538,6 +1555,8 @@ function Index() {
                               </button>
                             </div>
                           </div>
+                        )}
+                        </div>
                         )}
                       </div>
                     )}
@@ -1582,7 +1601,7 @@ function Index() {
                           setLinking(null);
                         }}
                       >
-                        {linkTarget ? `Collega a ${linkTarget}` : "Collega"}
+                        {linkTarget ? `Associa a ${linkTarget}` : "Associa"}
                       </Button>
                       <button
                         type="button"
