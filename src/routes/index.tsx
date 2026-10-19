@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { Trash2, Users, Keyboard, Plus, ChevronDown, Check, Sun, Moon, Monitor, Settings, FileText, ArrowRight, ArrowLeftRight, X } from "lucide-react";
-import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
+import { format, addDays, isToday, startOfMonth, endOfMonth, isSameMonth, startOfWeek, getDay, differenceInCalendarWeeks, differenceInCalendarDays, getDaysInMonth, subMonths } from "date-fns";
 import { it } from "date-fns/locale";
 
 import { aliasLookup, loadAliases, saveAliases, similarNames, withAlias, type Alias } from "@/lib/aliases";
@@ -32,7 +32,7 @@ import {
   type DayOverride,
   type OverrideStore,
 } from "@/lib/overrides";
-import { overallTimes, shiftFromTimes, shiftWithOvertime, toMinutes, type DayData, type Overtime } from "@/lib/shifts";
+import { formatHours, overallTimes, shiftFromTimes, shiftWithOvertime, toMinutes, type DayData, type Overtime } from "@/lib/shifts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -239,7 +239,23 @@ function contrastTextColor(hex: string): string {
   return luminance > 0.5 ? "#000000" : "#FFFFFF";
 }
 
-type WeekData = { monday: Date | undefined; days: DayData[]; mods: boolean[]; files: DayData[] };
+/** Totale settimanale (da domenica a sabato, come nel file Excel). `missing` = primo giorno non coperto da alcun file. */
+type WeekTotal = { sunday: Date; saturday: Date; missing: Date | null; total: number; ordinary: number; overtime: number };
+type WeekData = { monday: Date | undefined; days: DayData[]; mods: boolean[]; files: DayData[]; tot: WeekTotal | null };
+
+/** "7h30" / "6h" -> minuti (formato prodotto da formatHours). */
+function labelToMinutes(label: string | null | undefined): number {
+  const m = (label ?? "").match(/^(\d+)h(\d{2})?$/);
+  return m ? Number(m[1]) * 60 + Number(m[2] ?? 0) : 0;
+}
+
+/** Minuti ordinari e di straordinario di un giorno; il totale del turno comprende già lo straordinario. */
+function dayMinutes(d: DayData): { ordinary: number; overtime: number } {
+  if (!d) return { ordinary: 0, overtime: 0 };
+  const total = labelToMinutes(d.total);
+  const overtime = d.ot ? Math.min(labelToMinutes(d.ot.otTotal), total) : 0;
+  return { ordinary: total - overtime, overtime };
+}
 
 /**
  * Confronta il nominativo del calendario con il valore della cella Excel: stessa scrittura
@@ -802,7 +818,28 @@ function Index() {
         fileShifts.push(fromFile);
         return applyOverride(fromFile, ov);
       });
-      return { monday, days, mods, files: fileShifts };
+      // Totale da domenica a sabato: la domenica che lo apre sta nella riga sopra (o nel mese prima).
+      const covered = (d: Date) =>
+        fileList.some((f) => {
+          const off = differenceInCalendarDays(d, f.anchor);
+          return off >= 0 && off < f.weeks * 7;
+        });
+      const sunday = addDays(monday, -1);
+      const span = [sunday, ...days.slice(0, 6).map((_, i) => addDays(monday, i))];
+      const missingDays = span.filter((d) => !covered(d));
+      let tot: WeekTotal | null = null;
+      if (missingDays.length < span.length) {
+        const sundayData = applyOverride(resolveDay(selected, sunday)?.data ?? null, overrideFor(sunday, selected));
+        let ordinary = 0;
+        let overtime = 0;
+        for (const d of [sundayData, ...days.slice(0, 6)]) {
+          const m = dayMinutes(d);
+          ordinary += m.ordinary;
+          overtime += m.overtime;
+        }
+        tot = { sunday, saturday: addDays(monday, 5), missing: missingDays[0] ?? null, total: ordinary + overtime, ordinary, overtime };
+      }
+      return { monday, days, mods, files: fileShifts, tot };
     });
   }, [selected, month, gridStart, fileList, resolveDay, overrideFor]);
 
@@ -1686,11 +1723,11 @@ function Index() {
         </section>
 
         {/* Month: one week per row, ciascuna settimana inscritta in una cornice */}
-        <section className="mt-3 space-y-2">
+        <section className="mt-3 space-y-5">
           {weeks.map((week, weekIdx) => (
             <div
               key={weekIdx}
-              className="rounded-2xl border border-border/60 p-1.5 sm:rounded-3xl sm:p-2"
+              className="relative rounded-2xl border border-border/60 p-1.5 pb-2 sm:rounded-3xl sm:p-2"
               style={{ backgroundColor: "var(--app-week)" }}
             >
               <div className="grid grid-cols-7 gap-1 sm:gap-2">
@@ -1881,6 +1918,80 @@ function Index() {
                   );
                 })}
               </div>
+              {week.tot && (() => {
+                const t = week.tot;
+                const key = `tot-${weekIdx}`;
+                const open = peekKey === key;
+                const sameMonth = isSameMonth(t.sunday, t.saturday);
+                const range = sameMonth
+                  ? `${dateCapitalized(t.sunday, "EEE d")} – ${dateCapitalized(t.saturday, "EEE d MMMM")}`
+                  : `${dateCapitalized(t.sunday, "EEE d MMMM")} – ${dateCapitalized(t.saturday, "EEE d MMMM")}`;
+                const label = t.missing ? "–" : formatHours(t.total);
+                return (
+                  <>
+                    {/* Pillola a cavallo del bordo inferiore: il totale della settimana, senza togliere spazio alle tessere */}
+                    <button
+                      type="button"
+                      data-peek
+                      aria-label={`Totale da ${range}: ${t.missing ? "incompleto" : label}`}
+                      aria-expanded={open}
+                      className="absolute -bottom-[14px] right-0.5 z-20 flex h-6 w-16 items-center justify-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPeekKey(open ? null : key);
+                      }}
+                    >
+                      <span className="flex h-[14px] items-center rounded-[7px] border border-border/60 bg-[var(--app-tile)] px-1.5 text-[9px] font-normal leading-none text-foreground shadow-sm">
+                        {label}
+                      </span>
+                    </button>
+                    {open && (
+                      <div
+                        data-peek
+                        role="status"
+                        className="ios-in glass absolute right-0.5 top-[calc(100%+18px)] z-40 w-56 rounded-[22px] px-3.5 py-3 text-foreground"
+                        style={{ transformOrigin: "100% 0" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="text-xs text-muted-foreground">{range}</div>
+                        {t.missing ? (
+                          <>
+                            <p className="mt-2 text-[13px] leading-snug">
+                              {`Manca ${getDay(t.missing) === 0 ? "la domenica" : "il giorno"} ${format(t.missing, "d MMMM", { locale: it })}: carica il file di ${format(t.missing, "MMMM", { locale: it })} per avere il totale.`}
+                            </p>
+                            <Button
+                              className="mt-2.5 h-9 w-full rounded-xl text-sm text-white hover:opacity-90"
+                              style={{ backgroundColor: "var(--app-upload)" }}
+                              onClick={() => {
+                                setPeekKey(null);
+                                fileRef.current?.click();
+                              }}
+                            >
+                              Carica file
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="mt-1 flex items-baseline justify-between">
+                              <span className="text-[13px] font-semibold">Totale</span>
+                              <span className="text-xl font-bold">{formatHours(t.total)}</span>
+                            </div>
+                            <div className="my-2 h-px bg-border" />
+                            <div className="flex justify-between text-[13px]">
+                              <span className="text-muted-foreground">Ordinario</span>
+                              <span className="font-semibold">{formatHours(t.ordinary)}</span>
+                            </div>
+                            <div className="mt-0.5 flex justify-between text-[13px]">
+                              <span className="text-muted-foreground">Straordinario</span>
+                              <span className="font-semibold">{formatHours(t.overtime)}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           ))}
         </section>
