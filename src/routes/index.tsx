@@ -1922,6 +1922,7 @@ function Index() {
                 const t = week.tot;
                 const key = `tot-${weekIdx}`;
                 const open = peekKey === key;
+                const upward = weekIdx === weeks.length - 1;
                 const sameMonth = isSameMonth(t.sunday, t.saturday);
                 const range = sameMonth
                   ? `${dateCapitalized(t.sunday, "EEE d")} – ${dateCapitalized(t.saturday, "EEE d MMMM")}`
@@ -1949,8 +1950,12 @@ function Index() {
                       <div
                         data-peek
                         role="status"
-                        className="ios-in glass absolute right-0.5 top-[calc(100%+18px)] z-40 w-56 rounded-[22px] px-3.5 py-3 text-foreground"
-                        style={{ transformOrigin: "100% 0" }}
+                        className={cn(
+                          "ios-in glass absolute right-0.5 z-40 w-56 rounded-[22px] px-3.5 py-3 text-foreground",
+                          // L'ultima settimana si apre verso l'alto: sotto non c'è spazio nello schermo.
+                          upward ? "bottom-[12px]" : "top-[calc(100%+18px)]",
+                        )}
+                        style={{ transformOrigin: upward ? "100% 100%" : "100% 0" }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="text-xs text-muted-foreground">{range}</div>
