@@ -252,13 +252,13 @@
 .ios-dialog[data-state="closed"] {
   animation: ios-hold 0.18s linear forwards;
 }
-/* Prova: le schede del pop-up del giorno non hanno nessuna animazione di zoom (solo la dissolvenza del
-   contenitore): su Safari le trasformazioni animate possono far perdere la sfocatura dello sfondo al vetro. */
 .ios-dialog[data-state="open"] .ios-card {
-  animation: none;
+  transform-origin: 50% 0;
+  animation: ios-in 0.38s cubic-bezier(0.2, 0.9, 0.25, 1) backwards;
 }
 .ios-dialog[data-state="closed"] .ios-card {
-  animation: none;
+  transform-origin: 50% 0;
+  animation: ios-out 0.18s ease-in forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
