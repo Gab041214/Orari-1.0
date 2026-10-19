@@ -2010,7 +2010,7 @@ function Index() {
 
       <Dialog open={!!dayPopup} onOpenChange={(o) => !o && setPopupDate(null)}>
         <DialogContent
-          className="top-[max(1rem,calc(50dvh-380px))] max-h-[calc(100dvh-2rem)] w-[360px] max-w-[calc(100vw-1rem)] translate-y-0 gap-3.5 overflow-y-auto border-0 bg-transparent px-2 pb-3 pt-0 shadow-none sm:rounded-none"
+          className="top-[max(1rem,calc(50dvh-380px))] max-h-[calc(100dvh-2rem)] w-[360px] max-w-[calc(100vw-1rem)] translate-y-0 gap-3.5 [@media(max-height:760px)]:overflow-y-auto border-0 bg-transparent px-2 pb-3 pt-0 shadow-none sm:rounded-none"
           showCloseButton={false}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
