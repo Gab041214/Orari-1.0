@@ -579,14 +579,9 @@ function Index() {
   // "Orari di esercizio": correzioni dell'utente (il resto è dedotto dai file) e sezione aperta/chiusa.
   const [hoursOverrides, setHoursOverrides] = useState<HoursOverrides>({});
   const [hoursOpen, setHoursOpen] = useState(false);
-  // Una sola sezione aperta alla volta: aprirne una chiude le altre (Straordinari e Opzioni avanzate sono alla pari,
-  // così come Orari di esercizio e Gestione nomi dentro Opzioni avanzate).
-  const toggleOvertime = () => {
-    setOvertimeOpen((o) => !o);
-    setAdvancedOpen(false);
-    setMoreOpen(false);
-    setHoursOpen(false);
-  };
+  // Una sola sezione aperta alla volta: Report e backup, Orari di esercizio e Gestione nomi sono alla pari,
+  // aprirne una chiude le altre ("Straordinari" è dentro Report e backup).
+  const toggleOvertime = () => setOvertimeOpen((o) => !o);
   const toggleAdvanced = () => {
     setAdvancedOpen((o) => !o);
     setOvertimeOpen(false);
@@ -595,10 +590,14 @@ function Index() {
   };
   const toggleHours = () => {
     setHoursOpen((o) => !o);
+    setAdvancedOpen(false);
+    setOvertimeOpen(false);
     setMoreOpen(false);
   };
   const toggleMore = () => {
     setMoreOpen((o) => !o);
+    setAdvancedOpen(false);
+    setOvertimeOpen(false);
     setHoursOpen(false);
   };
   // Nomi collegati (grafia nel file -> nome in elenco) e relativi pannelli.
@@ -1458,6 +1457,17 @@ function Index() {
                       ))}
                     </div>
                     <div className="-mx-3.5 my-3 h-px bg-[var(--glass-sep)]" />
+                    <button
+                      type="button"
+                      aria-expanded={advancedOpen}
+                      onClick={toggleAdvanced}
+                      className="flex min-h-11 w-full items-center justify-start gap-1 whitespace-nowrap px-2.5 text-[13px] font-semibold text-foreground"
+                    >
+                      Report e backup
+                      <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", advancedOpen && "rotate-180")} />
+                    </button>
+                    {advancedOpen && (
+                      <div className="animate-in fade-in-0 slide-in-from-top-1 pt-1 duration-200 motion-reduce:animate-none">
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">Mese</p>
                     <div className="flex items-center gap-2">
                       <button
@@ -1516,17 +1526,6 @@ function Index() {
                           )}
                         </div>
                       )}
-                    <button
-                      type="button"
-                      aria-expanded={advancedOpen}
-                      onClick={toggleAdvanced}
-                      className="mt-1 flex min-h-11 w-full items-center justify-start gap-1 whitespace-nowrap px-2.5 text-[13px] font-semibold text-foreground"
-                    >
-                      Opzioni avanzate
-                      <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", advancedOpen && "rotate-180")} />
-                    </button>
-                    {advancedOpen && (
-                      <div className="animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none">
                         <div className="-mx-3.5 my-2.5 h-px bg-[var(--glass-sep)]" />
                         <p className="mb-1.5 text-xs font-medium text-muted-foreground">Modifiche e straordinari</p>
                         <input
@@ -1564,6 +1563,8 @@ function Index() {
                             <p className="text-muted-foreground">{backupNote.body}</p>
                           </div>
                         )}
+                      </div>
+                    )}
                         <div className="-mx-3.5 mt-2.5 mb-0.5 h-px bg-[var(--glass-sep)]" />
                         <button
                           type="button"
@@ -1621,7 +1622,7 @@ function Index() {
                               className="mt-0.5 flex min-h-11 w-full items-center justify-center rounded-[14px] px-2.5 text-sm font-semibold text-foreground"
                               style={{ backgroundColor: "var(--glass-chip)" }}
                             >
-                              Ripristina valori
+                              Ripristina orari
                             </button>
                           </div>
                         )}
@@ -1740,8 +1741,6 @@ function Index() {
                         )}
                         </div>
                         )}
-                      </div>
-                    )}
                   </PopoverContent>
                 </Popover>
             </div>
