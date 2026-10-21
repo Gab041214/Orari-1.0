@@ -1013,31 +1013,31 @@ function Index() {
 
   // Apertura e chiusura dedotte dai file: per ogni giorno dei file il primo ingresso e l'ultima uscita, raccolti per giorno della settimana.
   const inferredHours = useMemo(() => {
-    const lastEnd = new Map<string, { weekday: number; start: number; end: number }>();
+    const lastEnd = new Map<string, { weekday: number; starts: number[]; end: number }>();
     for (const f of fileList) {
       const perName = mapsByFile.get(f.key);
       if (!perName) continue;
       for (let off = 0; off < f.weeks * 7; off++) {
         let end = 0;
-        let start = Infinity;
+        const dayStarts: number[] = [];
         for (const map of perName.values()) {
           const data = map.get(off);
           if (!data) continue;
           const t = overallTimes(data);
           const s = toMinutes(t.start);
           const e = toMinutes(t.end);
-          if (s !== null && s < start) start = s;
+          if (s !== null) dayStarts.push(s);
           if (e !== null && e > end) end = e;
         }
-        if (end === 0 || start === Infinity) continue;
+        if (end === 0 || dayStarts.length === 0) continue;
         const date = addDays(f.anchor, off);
-        lastEnd.set(dayKey(date), { weekday: weekdayIndex(date), start, end });
+        lastEnd.set(dayKey(date), { weekday: weekdayIndex(date), starts: dayStarts, end });
       }
     }
     const starts: number[][] = Array.from({ length: 7 }, () => []);
     const ends: number[][] = Array.from({ length: 7 }, () => []);
-    for (const { weekday, start, end } of lastEnd.values()) {
-      starts[weekday].push(start);
+    for (const { weekday, starts: dayStarts, end } of lastEnd.values()) {
+      starts[weekday].push(...dayStarts);
       ends[weekday].push(end);
     }
     return inferHours(starts, ends);
