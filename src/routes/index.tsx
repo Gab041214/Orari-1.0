@@ -1456,7 +1456,7 @@ function Index() {
                         />
                       ))}
                     </div>
-                    <div className="-mx-3.5 my-3 h-px bg-[var(--glass-sep)]" />
+                    <div className="-mx-3.5 mt-3 mb-0.5 h-px bg-[var(--glass-sep)]" />
                     <button
                       type="button"
                       aria-expanded={advancedOpen}
@@ -1631,7 +1631,10 @@ function Index() {
                           type="button"
                           aria-expanded={moreOpen}
                           onClick={toggleMore}
-                          className="flex min-h-11 w-full items-center justify-start gap-1 whitespace-nowrap px-2.5 text-[13px] font-semibold text-foreground"
+                          className={cn(
+                            "flex min-h-11 w-full items-center justify-start gap-1 whitespace-nowrap px-2.5 text-[13px] font-semibold text-foreground",
+                            !moreOpen && "-mb-1",
+                          )}
                         >
                           Gestione nomi
                           <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", moreOpen && "rotate-180")} />
