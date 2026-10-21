@@ -574,11 +574,33 @@ function Index() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [overtimeOpen, setOvertimeOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  // "Altre opzioni" (nomi associati): contratta a ogni apertura del menu.
+  // "Gestione nomi" (nomi associati): contratta a ogni apertura del menu.
   const [moreOpen, setMoreOpen] = useState(false);
   // "Orari di esercizio": correzioni dell'utente (il resto è dedotto dai file) e sezione aperta/chiusa.
   const [hoursOverrides, setHoursOverrides] = useState<HoursOverrides>({});
   const [hoursOpen, setHoursOpen] = useState(false);
+  // Una sola sezione aperta alla volta: aprirne una chiude le altre (Straordinari e Opzioni avanzate sono alla pari,
+  // così come Orari di esercizio e Gestione nomi dentro Opzioni avanzate).
+  const toggleOvertime = () => {
+    setOvertimeOpen((o) => !o);
+    setAdvancedOpen(false);
+    setMoreOpen(false);
+    setHoursOpen(false);
+  };
+  const toggleAdvanced = () => {
+    setAdvancedOpen((o) => !o);
+    setOvertimeOpen(false);
+    setMoreOpen(false);
+    setHoursOpen(false);
+  };
+  const toggleHours = () => {
+    setHoursOpen((o) => !o);
+    setMoreOpen(false);
+  };
+  const toggleMore = () => {
+    setMoreOpen((o) => !o);
+    setHoursOpen(false);
+  };
   // Nomi collegati (grafia nel file -> nome in elenco) e relativi pannelli.
   const [aliases, setAliases] = useState<Alias[]>([]);
   const aliasMap = useMemo(() => aliasLookup(aliases), [aliases]);
@@ -1437,19 +1459,34 @@ function Index() {
                     </div>
                     <div className="-mx-3.5 my-3 h-px bg-[var(--glass-sep)]" />
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">Mese</p>
-                    <div className="mb-1.5 rounded-[14px]" style={{ backgroundColor: "var(--glass-chip)" }}>
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         disabled={!hasMonth}
                         aria-expanded={overtimeOpen}
-                        onClick={() => setOvertimeOpen((o) => !o)}
-                        className="flex min-h-11 w-full items-center justify-between px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
+                        onClick={toggleOvertime}
+                        className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-1 rounded-[14px] px-2.5 text-left text-sm font-semibold text-foreground disabled:opacity-40"
+                        style={{ backgroundColor: "var(--glass-chip)" }}
                       >
-                        Straordinari del mese
+                        Straordinari
                         <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", overtimeOpen && "rotate-180")} />
                       </button>
+                      <button
+                        type="button"
+                        disabled={!hasMonth}
+                        onClick={generatePdf}
+                        className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-[14px] px-2 text-sm font-semibold text-foreground disabled:opacity-40"
+                        style={{ backgroundColor: "var(--glass-chip)" }}
+                      >
+                        <FileText className="size-4 shrink-0" />
+                        Genera PDF
+                      </button>
+                    </div>
                       {overtimeOpen && hasMonth && (
-                        <div className="animate-in fade-in-0 slide-in-from-top-1 px-2.5 pb-2 duration-200 motion-reduce:animate-none">
+                        <div
+                          className="animate-in fade-in-0 slide-in-from-top-1 mt-1.5 rounded-[14px] px-2.5 py-2 duration-200 motion-reduce:animate-none"
+                          style={{ backgroundColor: "var(--glass-chip)" }}
+                        >
                           <p className="pb-0.5 text-xs text-muted-foreground">
                             {selected} · {month ? format(month, "MMMM", { locale: it }).replace(/^./, (c) => c.toUpperCase()) : ""}
                           </p>
@@ -1479,32 +1516,15 @@ function Index() {
                           )}
                         </div>
                       )}
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        disabled={!hasMonth}
-                        onClick={generatePdf}
-                        className="flex min-h-11 w-[calc(50%-4px)] items-center justify-center gap-2 whitespace-nowrap rounded-[14px] px-2 text-sm font-semibold text-foreground disabled:opacity-40"
-                        style={{ backgroundColor: "var(--glass-chip)" }}
-                      >
-                        <FileText className="size-4 shrink-0" />
-                        Genera PDF
-                      </button>
-                      <button
-                        type="button"
-                        aria-expanded={advancedOpen}
-                        onClick={() => {
-                          setAdvancedOpen((o) => !o);
-                          setMoreOpen(false);
-                      setHoursOpen(false);
-                        }}
-                        className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1 text-[13px] font-semibold text-foreground"
-                      >
-                        Opzioni avanzate
-                        <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", advancedOpen && "rotate-180")} />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      aria-expanded={advancedOpen}
+                      onClick={toggleAdvanced}
+                      className="mt-1 flex min-h-11 w-full items-center justify-start gap-1 whitespace-nowrap px-2.5 text-[13px] font-semibold text-foreground"
+                    >
+                      Opzioni avanzate
+                      <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", advancedOpen && "rotate-180")} />
+                    </button>
                     {advancedOpen && (
                       <div className="animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none">
                         <div className="-mx-3.5 my-2.5 h-px bg-[var(--glass-sep)]" />
@@ -1548,7 +1568,7 @@ function Index() {
                         <button
                           type="button"
                           aria-expanded={hoursOpen}
-                          onClick={() => setHoursOpen((o) => !o)}
+                          onClick={toggleHours}
                           className="flex min-h-11 w-full items-center justify-start gap-1 whitespace-nowrap px-2.5 text-[13px] font-semibold text-foreground"
                         >
                           Orari di esercizio
@@ -1609,10 +1629,10 @@ function Index() {
                         <button
                           type="button"
                           aria-expanded={moreOpen}
-                          onClick={() => setMoreOpen((o) => !o)}
+                          onClick={toggleMore}
                           className="flex min-h-11 w-full items-center justify-start gap-1 whitespace-nowrap px-2.5 text-[13px] font-semibold text-foreground"
                         >
-                          Altre opzioni
+                          Gestione nomi
                           <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", moreOpen && "rotate-180")} />
                         </button>
                         {moreOpen && (
