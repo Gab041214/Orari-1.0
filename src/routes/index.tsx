@@ -614,6 +614,15 @@ function Index() {
   const [linkFormOpen, setLinkFormOpen] = useState(false);
   const [linkFrom, setLinkFrom] = useState("");
   const [linkTo, setLinkTo] = useState("");
+  const clearLinkForm = () => {
+    setLinkFrom("");
+    setLinkTo("");
+    setLinkFormOpen(false);
+  };
+  // Il modulo si svuota anche quando "Gestione nomi" si chiude (o si chiude il menu Impostazioni).
+  useEffect(() => {
+    if (!moreOpen) clearLinkForm();
+  }, [moreOpen]);
   // Esito dell'ultima esportazione/importazione delle modifiche, mostrato sotto i pulsanti.
   const [backupNote, setBackupNote] = useState<{ title: string; body: string } | null>(null);
   const backupRef = useRef<HTMLInputElement>(null);
@@ -1064,6 +1073,11 @@ function Index() {
     return inferHours(starts, ends);
   }, [fileList, mapsByFile]);
   const hours = useMemo(() => effectiveHours(hoursOverrides, inferredHours), [hoursOverrides, inferredHours]);
+  // Attivo solo se qualche orario è diverso da quello dedotto dai file.
+  const hoursModified = useMemo(() => {
+    const base = effectiveHours({}, inferredHours);
+    return hours.some((h, i) => h.open !== base[i].open || h.close !== base[i].close);
+  }, [hours, inferredHours]);
   const changeHours = (day: number, field: "open" | "close", delta: number) => {
     const [lo, hi] = field === "open" ? OPEN_RANGE : CLOSE_RANGE;
     const value = Math.min(hi, Math.max(lo, hours[day][field] + delta));
@@ -1616,14 +1630,14 @@ function Index() {
                                 ))}
                               </div>
                             ))}
-                            <button
-                              type="button"
+                            <Button
+                              disabled={!hoursModified}
+                              className="mt-0.5 w-full rounded-xl text-[13px] text-white hover:opacity-90"
+                              style={{ backgroundColor: "var(--app-upload)" }}
                               onClick={resetHours}
-                              className="mt-0.5 flex min-h-11 w-full items-center justify-center rounded-[14px] px-2.5 text-sm font-semibold text-foreground"
-                              style={{ backgroundColor: "var(--glass-chip)" }}
                             >
                               Ripristina orari
-                            </button>
+                            </Button>
                           </div>
                         )}
                         <div className="-mx-3.5 mt-2.5 mb-0.5 h-px bg-[var(--glass-sep)]" />
@@ -1734,7 +1748,7 @@ function Index() {
                               </Button>
                               <button
                                 type="button"
-                                onClick={() => setLinkFormOpen(false)}
+                                onClick={clearLinkForm}
                                 className="rounded-xl border border-border bg-card px-3.5 py-2 text-[13px] text-foreground"
                               >
                                 Annulla
