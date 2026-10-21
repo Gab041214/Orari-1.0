@@ -1,8 +1,8 @@
 /**
  * Orari di esercizio: apertura e chiusura per ogni giorno della settimana (lunedì = 0 … domenica = 6).
  * Decidono chi compare in "Apertura" e in "Chiusura" nel pop-up del giorno. L'apertura parte da
- * e la chiusura sono dedotte dai file caricati (primo ingresso e ultima uscita più frequenti di quel
- * giorno della settimana). Le correzioni dell'utente si ricordano su questo dispositivo.
+ * è dedotta dai file (ingresso più frequente tra i turni della mattina di quel giorno della settimana),
+ * la chiusura pure (ultima uscita giornaliera più frequente). Le correzioni dell'utente si ricordano su questo dispositivo.
  */
 
 export type DayHours = { open: number; close: number };
@@ -14,6 +14,9 @@ export const DEFAULT_CLOSE = 20 * 60;
 export const HOURS_STEP = 30;
 export const OPEN_RANGE: [number, number] = [6 * 60, 14 * 60];
 export const CLOSE_RANGE: [number, number] = [16 * 60, 24 * 60];
+
+/** Per dedurre l'apertura contano solo i turni che cominciano la mattina (prima di quest'ora). */
+const OPEN_INFER_LIMIT = 12 * 60;
 
 const HOURS_KEY = "orari.hours";
 
@@ -64,13 +67,13 @@ function mostCommon(values: number[]): number | null {
   return best;
 }
 
-/** Apertura e chiusura dedotte per giorno della settimana, da primo ingresso e ultima uscita di ogni giorno (null = nessun dato). */
+/** Apertura e chiusura dedotte per giorno della settimana: ingressi di tutti i turni e ultima uscita di ogni giorno (null = nessun dato). */
 export function inferHours(
-  firstStartsByWeekday: number[][],
+  startsByWeekday: number[][],
   lastEndsByWeekday: number[][],
 ): { open: number | null; close: number | null }[] {
   return Array.from({ length: 7 }, (_, i) => ({
-    open: mostCommon((firstStartsByWeekday[i] ?? []).filter((m) => m <= OPEN_RANGE[1])),
+    open: mostCommon((startsByWeekday[i] ?? []).filter((m) => m >= OPEN_RANGE[0] && m < OPEN_INFER_LIMIT)),
     close: mostCommon((lastEndsByWeekday[i] ?? []).filter((m) => m >= CLOSE_RANGE[0])),
   }));
 }
