@@ -7,6 +7,7 @@ import { it } from "date-fns/locale";
 import { aliasLookup, loadAliases, saveAliases, similarNames, withAlias, type Alias } from "@/lib/aliases";
 import {
   CLOSE_RANGE,
+  DEFAULT_OPEN,
   HOURS_STEP,
   OPEN_RANGE,
   effectiveHours,
@@ -219,19 +220,16 @@ async function parseExcel(
 /** Restituisce nero o bianco per il massimo contrasto rispetto al colore esadecimale dato. */
 type ShiftEntry = { name: string; startLabel: string; endLabel: string; startMin: number; endMin: number; modified: boolean };
 
-const BASE_RANGE_START = 10 * 60;
-const BASE_RANGE_END = 20 * 60;
-
 /**
  * Calcola posizione e larghezza (in %) del tratto colorato di un turno, sul range
- * [rangeStart, rangeEnd] passato da chi chiama: di norma 10:00-20:00, ma esteso quando
- * quel giorno ci sono turni fuori da questi orari (es. venerdì/sabato fino alle 20:30).
+ * [rangeStart, rangeEnd] passato da chi chiama: l'apertura e la chiusura del giorno della settimana
+ * (Orari di esercizio), con la fine estesa se quel giorno c'è un turno che finisce dopo.
  */
 function barMetrics(
   startMin: number,
   endMin: number,
-  rangeStart: number = BASE_RANGE_START,
-  rangeEnd: number = BASE_RANGE_END,
+  rangeStart: number,
+  rangeEnd: number,
 ): { left: number; width: number } {
   const span = rangeEnd - rangeStart;
   const clamp = (v: number) => Math.min(Math.max(v, rangeStart), rangeEnd);
@@ -1917,6 +1915,9 @@ function Index() {
                 {DAY_LABELS.map((label, i) => {
                   const date = week.monday ? addDays(week.monday, i) : undefined;
                   const data = week.days[i];
+                  // "Tardo": il turno finisce all'orario di chiusura del giorno della settimana (colonna i = lunedì…domenica) o più tardi.
+                  const closeMin = hours[i]?.close;
+                  const isLate = !!data && data.endMin !== null && closeMin !== undefined && data.endMin >= closeMin;
                   // Straordinario a blocco (prima/dopo): ha orari propri; "tutto il turno" no.
                   const otBlock = !!data?.ot && data.ot.side !== "all";
                   // Giorni dei mesi vicini (stessa settimana): tinte attenuate, tranne con un riquadro aperto.
@@ -2003,17 +2004,17 @@ function Index() {
                               <span
                                 className={cn(
                                   "flex w-full items-center justify-center gap-[3px] whitespace-nowrap rounded-md px-1 py-[2px] text-center text-[10px] font-medium leading-none sm:gap-1 sm:rounded-xl sm:px-2 sm:py-[3px] sm:text-xs",
-                                  data.late ? undefined : "bg-[var(--app-tile-chip)] text-foreground",
+                                  isLate ? undefined : "bg-[var(--app-tile-chip)] text-foreground",
                                   data.ot && "gap-[2px] px-0.5 text-[9px]",
                                 )}
-                                style={data.late ? { backgroundColor: accent, color: contrastTextColor(accent) } : undefined}
+                                style={isLate ? { backgroundColor: accent, color: contrastTextColor(accent) } : undefined}
                               >
                                 {data.ot && (
                                   // Pallino: nella pillola colorata è "in sottrazione" (colore del fondo)
                                   <span
                                     aria-hidden
                                     className="size-[5px] shrink-0 rounded-full sm:size-[7px]"
-                                    style={{ backgroundColor: data.late ? "var(--app-tile)" : accent }}
+                                    style={{ backgroundColor: isLate ? "var(--app-tile)" : accent }}
                                   />
                                 )}
                                 <span>{data.total}</span>
@@ -2245,6 +2246,7 @@ function Index() {
               subtitle={`${selected} · ${dateCapitalized(dayPopup.date, "EEE d MMM")}`}
               fileShift={selectedFileShift}
               ordinary={applyOverride(selectedFileShift, overrideFor(dayPopup.date, selected), false)}
+              openMin={hours[weekdayIndex(dayPopup.date)]?.open ?? DEFAULT_OPEN}
               override={overrideFor(dayPopup.date, selected)}
               accent={accent}
               accentText={contrastTextColor(accent)}
