@@ -33,11 +33,14 @@ function draftFromShift(override: DayOverride | undefined, fileShift: DayData): 
   };
 }
 
-/** Nuovo straordinario: durata a zero; lato "dopo" per i turni di apertura (inizio entro le 10:00), "prima" per gli altri. */
-function otDraftFrom(ot: Overtime | undefined, ordinary: DayData): OtDraft {
+/**
+ * Nuovo straordinario: durata a zero; lato "dopo" per i turni di apertura (inizio entro l'orario di
+ * apertura del giorno, `openMin`), "prima" per gli altri.
+ */
+function otDraftFrom(ot: Overtime | undefined, ordinary: DayData, openMin: number): OtDraft {
   if (ot) return ot.side === "all" ? { side: "all", dur: "00:00" } : { side: ot.side, dur: minutesToTime(ot.min) };
   const start = ordinary ? toMinutes(ordinary.start) : null;
-  return { side: start !== null && start <= 10 * 60 ? "after" : "before", dur: "00:00" };
+  return { side: start !== null && start <= openMin ? "after" : "before", dur: "00:00" };
 }
 
 const cardClass =
@@ -57,6 +60,7 @@ export function DayEditPanels({
   subtitle,
   fileShift,
   ordinary,
+  openMin,
   override,
   accent,
   accentText,
@@ -71,6 +75,8 @@ export function DayEditPanels({
   fileShift: DayData;
   /** Orario ordinario attuale (file o modificato a mano), senza straordinario; null se a riposo. */
   ordinary: DayData;
+  /** Orario di apertura del giorno in minuti (Orari di esercizio): decide il lato proposto per lo straordinario. */
+  openMin: number;
   override: DayOverride | undefined;
   accent: string;
   accentText: string;
@@ -88,7 +94,7 @@ export function DayEditPanels({
     return () => onOpenChange?.(false);
   }, [panel, onOpenChange]);
   const [draft, setDraft] = useState<ShiftDraft>(() => draftFromShift(override, fileShift));
-  const [otDraft, setOtDraft] = useState<OtDraft>(() => otDraftFrom(override?.ot, ordinary));
+  const [otDraft, setOtDraft] = useState<OtDraft>(() => otDraftFrom(override?.ot, ordinary, openMin));
 
   const shiftModified = hasShiftOverride(override);
   const hasOt = !!override?.ot;
@@ -100,7 +106,7 @@ export function DayEditPanels({
   };
   const openOt = () => {
     if (!canOvertime) return;
-    setOtDraft(otDraftFrom(override?.ot, ordinary));
+    setOtDraft(otDraftFrom(override?.ot, ordinary, openMin));
     setPanel("ot");
   };
   const close = () => setPanel("closed");
