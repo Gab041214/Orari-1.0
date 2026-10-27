@@ -28,7 +28,7 @@ function NotFoundComponent() {
             to="/"
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Torna all'inizio
+            Torna alla home
           </Link>
         </div>
       </div>
@@ -47,7 +47,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           Impossibile caricare la pagina
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Qualcosa è andato storto. Prova ad aggiornare la pagina o torna all'inizio.
+          Qualcosa è andato storto. Prova ad aggiornare la pagina o torna alla home.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -63,7 +63,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             href={base}
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Torna all'inizio
+            Torna alla home
           </a>
         </div>
       </div>
