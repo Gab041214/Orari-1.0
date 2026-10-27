@@ -21,10 +21,10 @@ export function renderErrorPage(): string {
   <body>
     <div class="card">
       <h1>Impossibile caricare la pagina</h1>
-      <p>Qualcosa è andato storto. Prova ad aggiornare la pagina o torna all'inizio.</p>
+      <p>Qualcosa è andato storto. Prova ad aggiornare la pagina o torna alla home.</p>
       <div class="actions">
         <button class="primary" onclick="location.reload()">Riprova</button>
-        <a class="secondary" href="${base}">Torna all'inizio</a>
+        <a class="secondary" href="${base}">Torna alla home</a>
       </div>
     </div>
   </body>
