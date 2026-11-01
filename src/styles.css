@@ -389,5 +389,42 @@
     .dark .day-tile:not(.border-2) {
       border-color: rgba(0, 0, 0, 0.4);
     }
+
+    /* Oggi: riflesso chiaro interno del vetro (le regole di colore e alone stanno in fondo al file, per tutti i dispositivi) */
+    .day-tile {
+      --today-inset: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.3);
+    }
+    .dark .day-tile {
+      --today-inset: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
   }
+}
+
+/* Oggi: tre stili di cornice, scelti da Impostazioni > Oggi. Il colore segue l'accento della palette
+   (--today-accent / --today-rgb sono impostati sulla cella). Fuori da @layer: prevalgono sulle utility. */
+/* Solo la tessera di oggi sta sopra le vicine (non la cella intera: una cella con z-index
+   confinerebbe il riquadro "Turno originale" e ne spegnerebbe la sfocatura) */
+.day-tile.day-today {
+  z-index: 1;
+}
+.day-today-cornice {
+  border-width: 2px;
+  border-color: var(--today-accent);
+}
+.day-today-anello,
+.day-today-aura {
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.day-today-anello {
+  box-shadow:
+    var(--today-inset, inset 0 0 0 0 transparent),
+    0 0 0 1px rgba(var(--today-rgb), 0.55), 0 0 0 2px rgba(var(--today-rgb), 0.25), 0 0 5px 1.5px rgba(var(--today-rgb), 0.6);
+}
+.day-today-aura {
+  box-shadow: var(--today-inset, inset 0 0 0 0 transparent), 0 0 5px 1.5px rgba(var(--today-rgb), 0.6);
+}
+/* Campioni nel menu: stessi stili su una tessera piccola */
+.day-today-sample.day-today-cornice {
+  border-width: 2px;
 }
