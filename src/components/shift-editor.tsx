@@ -5,18 +5,24 @@ import { cn } from "@/lib/utils";
 import { hasShiftOverride, type DayOverride } from "@/lib/overrides";
 import {
   formatHours,
+  LEAVE_MAX_MIN,
+  LEAVE_STEP_MIN,
   minutesToTime,
   netMinutes,
+  shiftWithLeave,
   shiftWithOvertime,
   toMinutes,
   type DayData,
+  type Leave,
+  type LeaveKind,
   type Overtime,
   type OvertimeSide,
 } from "@/lib/shifts";
 
-type Panel = "closed" | "edit" | "ot";
+type Panel = "closed" | "edit" | "ot" | "leave";
 type ShiftDraft = { rest: boolean; start: string; end: string };
 type OtDraft = { side: OvertimeSide | "all"; dur: string };
+type LeaveDraft = { all: boolean; start: string; end: string; kind: LeaveKind; dur: string };
 
 function draftFromShift(override: DayOverride | undefined, fileShift: DayData): ShiftDraft {
   if (override && hasShiftOverride(override)) {
@@ -43,17 +49,26 @@ function otDraftFrom(ot: Overtime | undefined, ordinary: DayData, openMin: numbe
   return { side: start !== null && start <= openMin ? "after" : "before", dur: "00:00" };
 }
 
+function leaveDraftFrom(leave: Leave | undefined): LeaveDraft {
+  if (!leave) return { all: false, start: "", end: "", kind: "rol", dur: "00:00" };
+  if ("min" in leave) return { all: false, start: "", end: "", kind: leave.kind, dur: minutesToTime(leave.min) };
+  if ("all" in leave) return { all: true, start: "", end: "", kind: leave.kind ?? "rol", dur: "00:00" };
+  return { all: false, start: leave.start, end: leave.end, kind: "rol", dur: "00:00" };
+}
+
 const cardClass =
   "ios-card glass rounded-[28px] p-5";
 const collapsedClass =
-  "ios-card glass relative flex min-h-[60px] min-w-0 flex-1 items-center justify-between gap-1 rounded-[22px] pl-4 pr-3.5 text-left text-foreground disabled:opacity-40";
+  "ios-card glass relative flex min-h-[64px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[20px] px-1.5 py-1.5 text-center leading-tight text-foreground disabled:opacity-40";
 const inputClass =
   "box-border flex h-11 w-full min-w-0 max-w-full appearance-none items-center rounded-xl border border-border bg-clip-padding px-3 py-0 text-left text-[17px] leading-none text-foreground [-webkit-appearance:none] [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:text-left";
 
 /**
- * Finestre sotto "Apertura/Chiusura": "Modifica" (orario ordinario a mano) e "Straordinario"
- * (ore aggiunte prima o dopo l'ordinario). Chiuse stanno affiancate a metà larghezza; aprendone
- * una occupa tutta la larghezza e l'altra scompare. Va montata con una `key` diversa per ogni
+ * Finestre sotto "Apertura/Chiusura": "Modifica" (orario ordinario a mano), "Straordinario"
+ * (ore aggiunte prima o dopo l'ordinario) e "Ferie e ROL" (tutto il turno, oppure una fascia
+ * a inizio o fine turno). Chiuse, le prime due stanno affiancate a metà larghezza e la terza sotto,
+ * a tutta larghezza; aprendone una occupa tutta la larghezza e le altre scompaiono (così non serve scorrere).
+ * Straordinario e ROL non stanno insieme nello stesso giorno. Va montata con una `key` diversa per ogni
  * giorno/nominativo, così riparte chiusa.
  */
 export function DayEditPanels({
@@ -68,6 +83,8 @@ export function DayEditPanels({
   onResetShift,
   onSaveOvertime,
   onRemoveOvertime,
+  onSaveLeave,
+  onRemoveLeave,
   onOpenChange,
 }: {
   subtitle: string;
@@ -84,6 +101,8 @@ export function DayEditPanels({
   onResetShift: () => void;
   onSaveOvertime: (ot: Overtime) => void;
   onRemoveOvertime: () => void;
+  onSaveLeave: (leave: Leave) => void;
+  onRemoveLeave: () => void;
   /** Avvisa il pop-up quando un pannello si apre o si chiude (la scheda Apertura/Chiusura si riduce). */
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -95,10 +114,18 @@ export function DayEditPanels({
   }, [panel, onOpenChange]);
   const [draft, setDraft] = useState<ShiftDraft>(() => draftFromShift(override, fileShift));
   const [otDraft, setOtDraft] = useState<OtDraft>(() => otDraftFrom(override?.ot, ordinary, openMin));
+  const [leaveDraft, setLeaveDraft] = useState<LeaveDraft>(() => leaveDraftFrom(override?.perm));
+  // Con "Intero turno" attivo, toccando Salva si sceglie se è ferie o ROL.
+  const [choosingKind, setChoosingKind] = useState(false);
 
   const shiftModified = hasShiftOverride(override);
   const hasOt = !!override?.ot;
-  const canOvertime = !!ordinary;
+  const hasLeave = !!override?.perm;
+  // Straordinario e ROL si escludono a vicenda; lo straordinario vuole un turno. Le ferie/ROL si possono
+  // inserire anche in un giorno vuoto (solo ore), ma non se è segnato "a riposo".
+  const canOvertime = !!ordinary && !hasLeave;
+  const leaveOnly = !ordinary;
+  const canLeave = leaveOnly ? !override?.rest : !hasOt;
 
   const openEdit = () => {
     setDraft(draftFromShift(override, fileShift));
@@ -109,13 +136,56 @@ export function DayEditPanels({
     setOtDraft(otDraftFrom(override?.ot, ordinary, openMin));
     setPanel("ot");
   };
+  const openLeave = () => {
+    if (!canLeave) return;
+    setLeaveDraft(leaveDraftFrom(override?.perm));
+    setChoosingKind(false);
+    setPanel("leave");
+  };
   const close = () => setPanel("closed");
 
+  /** Scelta Ferie / ROL che compare toccando Salva per un giorno intero o per un giorno vuoto. */
+  const kindChooser = (onPick: (k: LeaveKind) => void) => (
+            <div className="flex flex-col gap-2.5" role="group" aria-label="Tipo di assenza">
+              <div className="text-[15px] font-semibold text-foreground">Che tipo di assenza è?</div>
+              <div className="flex gap-2">
+                {(["ferie", "rol"] as const).map((k) => {
+                  const on = leaveDraft.kind === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => {
+                        onPick(k);
+                        close();
+                      }}
+                      className={cn(
+                        "min-h-11 flex-1 rounded-xl text-[15px] font-semibold",
+                        on ? undefined : "border border-border text-foreground",
+                      )}
+                      style={on ? { backgroundColor: accent, color: accentText } : undefined}
+                    >
+                      {k === "ferie" ? "Ferie" : "ROL"}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setChoosingKind(false)}
+                className="min-h-11 w-full rounded-xl border border-border text-[15px] text-foreground"
+              >
+                Indietro
+              </button>
+            </div>
+  );
+
   if (panel === "closed") {
+    // Tre pulsanti sulla stessa riga: testo più piccolo e freccia sotto il nome ("Ferie e ROL" può andare su due righe).
     return (
-      <div className="flex gap-3.5">
+      <div className="flex gap-2">
         <button type="button" onClick={openEdit} aria-expanded={false} className={collapsedClass}>
-          <span className="whitespace-nowrap text-base font-semibold">Modifica</span>
+          <span className="text-[13px] font-semibold">Modifica</span>
           {shiftModified && (
             <span
               role="img"
@@ -124,7 +194,7 @@ export function DayEditPanels({
               style={{ backgroundColor: accent }}
             />
           )}
-          <ChevronDown className="size-4 shrink-0" />
+          <ChevronDown className="size-3.5 shrink-0" />
         </button>
         <button
           type="button"
@@ -133,7 +203,7 @@ export function DayEditPanels({
           aria-expanded={false}
           className={collapsedClass}
         >
-          <span className="whitespace-nowrap text-base font-semibold">Straordinario</span>
+          <span className="text-[13px] font-semibold">Straordinario</span>
           {hasOt && (
             <span
               role="img"
@@ -142,7 +212,25 @@ export function DayEditPanels({
               style={{ backgroundColor: accent }}
             />
           )}
-          <ChevronDown className="size-4 shrink-0" />
+          <ChevronDown className="size-3.5 shrink-0" />
+        </button>
+        <button
+          type="button"
+          onClick={openLeave}
+          disabled={!canLeave}
+          aria-expanded={false}
+          className={collapsedClass}
+        >
+          <span className="text-[13px] font-semibold">Ferie e ROL</span>
+          {hasLeave && (
+            <span
+              role="img"
+              aria-label="Con ferie o ROL"
+              className="absolute right-2 top-2 size-2 rounded-full"
+              style={{ backgroundColor: accent }}
+            />
+          )}
+          <ChevronDown className="size-3.5 shrink-0" />
         </button>
       </div>
     );
@@ -260,6 +348,234 @@ export function DayEditPanels({
             >
               <Undo2 className="size-[18px]" aria-hidden="true" />
               Ripristina turno originale
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (panel === "leave" && leaveOnly) {
+    // Giorno senza turno: servono solo le ore (da 30 minuti fino a 12 ore), non gli orari.
+    const durMin = toMinutes(leaveDraft.dur);
+    const durValid = durMin !== null && durMin > 0 && durMin <= LEAVE_MAX_MIN && durMin % LEAVE_STEP_MIN === 0;
+    const durInfo =
+      durMin === null || durMin === 0
+        ? "Inserisci le ore di ferie o ROL."
+        : durMin > LEAVE_MAX_MIN
+          ? "Al massimo 12 ore."
+          : durMin % LEAVE_STEP_MIN !== 0
+            ? "Le ore vanno inserite a passi di 30 minuti."
+            : `Ore di ferie o ROL: ${formatHours(durMin)}`;
+    return (
+      <div ref={cardRef} className={cardClass}>
+        <button
+          type="button"
+          onClick={close}
+          aria-expanded
+          className="flex w-full items-center justify-between gap-2 rounded-md text-left text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <h3 className="text-lg font-semibold">Ferie e ROL</h3>
+          <span className="inline-flex items-center gap-2.5">
+            {hasLeave && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="size-2 rounded-full" style={{ backgroundColor: accent }} />
+                Aggiunto
+              </span>
+            )}
+            <ChevronDown className="size-5 shrink-0 rotate-180" />
+          </span>
+        </button>
+
+        <div className="mt-1 flex flex-col gap-3">
+          <div className="text-base text-muted-foreground">{subtitle}</div>
+
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
+            Inserisci le ore di ferie o ROL (ore e minuti)
+            <input
+              type="time"
+              step={LEAVE_STEP_MIN * 60}
+              value={leaveDraft.dur}
+              onChange={(ev) => setLeaveDraft({ ...leaveDraft, dur: ev.target.value })}
+              className={inputClass}
+              style={{ backgroundColor: "var(--glass-chip)" }}
+            />
+          </label>
+
+          <div className="min-h-5 text-sm text-muted-foreground">{durInfo}</div>
+
+          {choosingKind ? (
+            kindChooser((k) => {
+              if (durValid && durMin !== null) onSaveLeave({ min: durMin, kind: k });
+            })
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={close}
+                className="min-h-11 flex-1 rounded-xl border border-border text-[15px] text-foreground"
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                disabled={!durValid}
+                onClick={() => setChoosingKind(true)}
+                className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold disabled:opacity-40"
+                style={{ backgroundColor: accent, color: accentText }}
+              >
+                Salva
+              </button>
+            </div>
+          )}
+
+          {hasLeave && (
+            <button
+              type="button"
+              onClick={() => {
+                onRemoveLeave();
+                close();
+              }}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-[15px] text-foreground"
+            >
+              <Minus className="size-[18px]" aria-hidden="true" />
+              Rimuovi ferie o ROL
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (panel === "leave") {
+    const ordStartMin = ordinary ? toMinutes(ordinary.start) : null;
+    const ordEndMin = ordinary ? toMinutes(ordinary.end) : null;
+    const ordHours = ordStartMin !== null && ordEndMin !== null ? formatHours(netMinutes(ordStartMin, ordEndMin)) : "";
+    const draftLeave: Leave | null = leaveDraft.all
+      ? { all: true }
+      : leaveDraft.start && leaveDraft.end
+        ? { start: leaveDraft.start, end: leaveDraft.end }
+        : null;
+    // Il ROL vale solo se coincide con l'inizio o con la fine del turno: lo decide shiftWithLeave.
+    const result = draftLeave && ordinary ? shiftWithLeave(ordinary, draftLeave) : null;
+    const leaveValid = !!result?.leave;
+    const leaveInfo = leaveDraft.all
+      ? `Tutto il turno (${ordHours}) sarà ferie o ROL.`
+      : !draftLeave
+        ? "Inserisci inizio e fine del ROL."
+        : !leaveValid
+          ? "Il ROL deve cominciare con il turno oppure finire con il turno."
+          : `Ore di ROL: ${formatHours(result!.leave!.min)} · Ore lavorate: ${result!.total ?? ""}`;
+
+    return (
+      <div ref={cardRef} className={cardClass}>
+        <button
+          type="button"
+          onClick={close}
+          aria-expanded
+          className="flex w-full items-center justify-between gap-2 rounded-md text-left text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <h3 className="text-lg font-semibold">Ferie e ROL</h3>
+          <span className="inline-flex items-center gap-2.5">
+            {hasLeave && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="size-2 rounded-full" style={{ backgroundColor: accent }} />
+                Aggiunto
+              </span>
+            )}
+            <ChevronDown className="size-5 shrink-0 rotate-180" />
+          </span>
+        </button>
+
+        <div className="mt-1 flex flex-col gap-3">
+          <div className="text-base text-muted-foreground">{subtitle}</div>
+
+          <div className="flex min-h-11 items-center justify-between gap-3">
+            <span id="leave-all-label" className="text-[15px] text-foreground">
+              Intero turno
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={leaveDraft.all}
+              aria-labelledby="leave-all-label"
+              onClick={() => setLeaveDraft({ ...leaveDraft, all: !leaveDraft.all })}
+              className="relative h-8 w-[52px] shrink-0 rounded-full"
+              style={{ backgroundColor: leaveDraft.all ? accent : "var(--app-switch-off)" }}
+            >
+              <span
+                className="absolute top-[3px] size-[26px] rounded-full bg-white shadow"
+                style={{ left: leaveDraft.all ? 23 : 3 }}
+              />
+            </button>
+          </div>
+
+          <div className={cn("grid grid-cols-2 gap-2.5", leaveDraft.all && "pointer-events-none opacity-40")}>
+            <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
+              Inizio
+              <input
+                type="time"
+                value={leaveDraft.start}
+                onChange={(ev) => setLeaveDraft({ ...leaveDraft, start: ev.target.value })}
+                className={inputClass}
+                style={{ backgroundColor: "var(--glass-chip)" }}
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
+              Fine
+              <input
+                type="time"
+                value={leaveDraft.end}
+                onChange={(ev) => setLeaveDraft({ ...leaveDraft, end: ev.target.value })}
+                className={inputClass}
+                style={{ backgroundColor: "var(--glass-chip)" }}
+              />
+            </label>
+          </div>
+
+          <div className="min-h-5 text-sm text-muted-foreground">{leaveInfo}</div>
+
+          {choosingKind ? (
+            kindChooser((k) => onSaveLeave({ all: true, kind: k }))
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={close}
+                className="min-h-11 flex-1 rounded-xl border border-border text-[15px] text-foreground"
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                disabled={!leaveDraft.all && !leaveValid}
+                onClick={() => {
+                  if (leaveDraft.all) {
+                    setChoosingKind(true);
+                    return;
+                  }
+                  if (draftLeave && leaveValid) onSaveLeave(draftLeave);
+                  close();
+                }}
+                className="min-h-11 flex-1 rounded-xl text-[15px] font-semibold disabled:opacity-40"
+                style={{ backgroundColor: accent, color: accentText }}
+              >
+                Salva
+              </button>
+            </div>
+          )}
+
+          {hasLeave && (
+            <button
+              type="button"
+              onClick={() => {
+                onRemoveLeave();
+                close();
+              }}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border text-[15px] text-foreground"
+            >
+              <Minus className="size-[18px]" aria-hidden="true" />
+              Rimuovi ferie o ROL
             </button>
           )}
         </div>
