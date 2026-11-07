@@ -85,6 +85,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { title: "Orari 1.0 — Turni e ore lavorate da Excel" },
       { name: "description", content: "Carica il file Excel dei turni, scegli il nome e consulta gli orari nel calendario." },
+      { name: "robots", content: "noindex, nofollow" },
       { name: "theme-color", content: "#f2f2f7" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "mobile-web-app-capable", content: "yes" },
